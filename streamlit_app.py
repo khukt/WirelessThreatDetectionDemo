@@ -150,7 +150,10 @@ DOMAIN_MAP = {
 st.set_page_config(page_title="TRUST AI — Wireless Threats (Sundsvall)", layout="wide")
 st.title("TRUST AI — Wireless Threat Detection Demo")
 st.caption("AMR & logistics fleet • RF/network realism • LightGBM + SHAP + Conformal • Type head (multiclass + rules) • Persona XAI • Cached models (no re-training on refresh)")
-
+st.warning("Disclaimer: This demo is intended solely for educational purposes."
+"It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
+"All content, data, and examples used in this demo are for learning and research purposes only."
+"The authors or presenters assume no responsibility for any misuse or unintended application of this material.", icon="⚠️")
 # ---- Cached model store to survive browser refresh (process cache) ----
 @st.cache_resource(show_spinner=False)
 def model_store():
