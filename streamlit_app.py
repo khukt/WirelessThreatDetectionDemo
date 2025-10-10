@@ -218,6 +218,13 @@ with st.sidebar:
     show_eu_status = st.checkbox("Show EU AI Act status banner", True)
 
 # Simple onboarding + EU status
+    st.warning(
+        "Disclaimer: This demo is intended solely for educational purposes."
+"It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
+"All content, data, and examples used in this demo are for learning and research purposes only."
+"The authors or presenters assume no responsibility for any misuse or unintended application of this material."
+    )
+
 if help_mode:
     st.info(
         "How to use: ① Pick a **Scenario** → ② Watch **map, KPIs, charts** update → "
