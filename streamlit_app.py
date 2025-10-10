@@ -27,12 +27,6 @@ warnings.filterwarnings(
     category=UserWarning
 )
 
-    st.warning(
-        "Disclaimer: This demo is intended solely for educational purposes."
-"It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
-"All content, data, and examples used in this demo are for learning and research purposes only."
-"The authors or presenters assume no responsibility for any misuse or unintended application of this material."
-    )
 
 SEED = 42
 np.random.seed(SEED)
