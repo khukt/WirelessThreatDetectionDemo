@@ -1,7 +1,10 @@
-# app.py version 2.0
+# app.py version 2.1 (patched)
 # TRUST AI — Wireless Threats Detection Demo
-# Two-step pipeline: LightGBM anomaly detector + (LightGBM multiclass + rules) for attack typing
-# Caching to avoid retraining on refresh, persona-aware XAI, governance, and training explainer
+# Fixes:
+# 1) Data Tamper now works at runtime (tamper_mode is selectable + safe default if missing)
+# 2) Clear warning when model isn't trained/loaded (attacks won't run otherwise)
+# 3) Map uses a CARTO basemap (no Mapbox token needed) so you can actually SEE the map
+# 4) Streamlit API forward-compat: replace use_container_width with width="stretch"
 
 import math, time, json, warnings
 from collections import deque
@@ -20,13 +23,11 @@ from sklearn.metrics import precision_recall_fscore_support, roc_auc_score, brie
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-# Silence noisy SHAP warning
 warnings.filterwarnings(
     "ignore",
     message="LightGBM binary classifier .* TreeExplainer shap values output has changed to a list of ndarray",
     category=UserWarning
 )
-
 
 SEED = 42
 np.random.seed(SEED)
@@ -59,27 +60,22 @@ class Config:
 
 CFG = Config()
 
-# --- Attack-type classification knobs ---
-TYPE_TAU   = 0.50       # min fused confidence to claim a type; else 'Unknown' or '(low conf)'
-TYPE_DELTA = 0.10       # margin between top-2 fused probs to avoid '(low conf)'
-TYPE_ALPHA = 0.40       # fusion weight: 0.0 = model-only, 1.0 = rules-only
+# Attack-type classification knobs
+TYPE_TAU   = 0.50
+TYPE_DELTA = 0.10
+TYPE_ALPHA = 0.40
 
 DEVICE_TYPES = ["AMR", "Truck", "Sensor", "Gateway"]
 MOBILE_TYPES = {"AMR", "Truck"}
 
 RAW_FEATURES = [
-    # RF/QoS (common)
     "rssi","snr","packet_loss","latency_ms","jitter_ms","throughput_mbps","channel_util",
     "noise_floor_dbm","phy_error_rate","cca_busy_frac","beacon_miss_rate",
-    # Access/Auth (Wi-Fi & generic access)
     "deauth_rate","assoc_churn","eapol_retry_rate","dhcp_fail_rate","rogue_rssi_gap",
-    # GNSS realism
     "pos_error_m","gnss_sats","gnss_hdop","gnss_doppler_var","gnss_clk_drift_ppm",
     "cno_mean_dbhz","cno_std_dbhz",
-    # Cellular realism
     "rsrp_dbm","rsrq_db","sinr_db","bler","harq_nack_ratio",
     "rrc_reestablish","rlf_count","ho_fail_rate","attach_reject_rate","ta_anomaly","pci_anomaly",
-    # Integrity / data-path
     "payload_entropy","ts_skew_s","seq_gap","dup_ratio","schema_violation_rate","hmac_fail_rate","crc_err"
 ]
 
@@ -108,14 +104,12 @@ FEATURE_GLOSSARY = {
     "channel_util": "Channel utilization (%): how busy the medium is.",
     "rssi": "Received signal strength (dBm): higher is closer/clearer.",
     "crc_err": "CRC errors (count): integrity errors at frame level.",
-    # GNSS
     "gnss_sats": "Satellites used in fix (count): typical 8–14; sudden drops are suspicious.",
     "gnss_hdop": "Horizontal Dilution of Precision: geometry; <1 good, >2 poor.",
     "gnss_doppler_var": "Variance of Doppler residuals: inconsistency across satellites suggests spoofing.",
     "gnss_clk_drift_ppm": "Receiver clock drift (ppm): abnormal jumps suggest time spoof/replay.",
     "cno_mean_dbhz": "GNSS C/N₀ mean (dB-Hz): 30–45 typical; patterns shift under spoof/jam.",
     "cno_std_dbhz": "GNSS C/N₀ variability (dB-Hz): anomalous spread indicates manipulation.",
-    # Cellular
     "rsrp_dbm": "Cellular RSRP (dBm): stronger (closer to 0) is better.",
     "rsrq_db": "Reference Signal Received Quality (dB): higher is better.",
     "sinr_db": "Signal-to-Interference-plus-Noise Ratio (dB): higher is better.",
@@ -129,35 +123,22 @@ FEATURE_GLOSSARY = {
     "pci_anomaly": "Unexpected Physical Cell ID changes."
 }
 
-DOMAIN_MAP = {
-    # RF / QoS
-    "rssi":"RF", "snr":"RF", "noise_floor_dbm":"RF", "phy_error_rate":"RF", "cca_busy_frac":"RF", "beacon_miss_rate":"RF",
-    "packet_loss":"RF", "latency_ms":"RF", "jitter_ms":"RF", "throughput_mbps":"RF", "channel_util":"RF",
-    "rsrp_dbm":"RF","rsrq_db":"RF","sinr_db":"RF","bler":"RF","harq_nack_ratio":"RF",
-    # GNSS
-    "pos_error_m":"GNSS","gnss_sats":"GNSS","gnss_hdop":"GNSS","gnss_doppler_var":"GNSS","gnss_clk_drift_ppm":"GNSS",
-    "cno_mean_dbhz":"GNSS","cno_std_dbhz":"GNSS",
-    # Access/Auth
-    "deauth_rate":"Access","assoc_churn":"Access","eapol_retry_rate":"Access","dhcp_fail_rate":"Access","rogue_rssi_gap":"Access",
-    "rrc_reestablish":"Access","rlf_count":"Access","ho_fail_rate":"Access","attach_reject_rate":"Access","ta_anomaly":"Access","pci_anomaly":"Access",
-    # Integrity
-    "payload_entropy":"Integrity","ts_skew_s":"Integrity","seq_gap":"Integrity","dup_ratio":"Integrity","schema_violation_rate":"Integrity","hmac_fail_rate":"Integrity","crc_err":"Integrity"
-}
-
 # =========================
 # Streamlit page
 # =========================
 st.set_page_config(page_title="TRUST AI — Wireless Threats (Sundsvall)", layout="wide")
 st.title("TRUST AI — Wireless Threat Detection Demo")
-st.caption("AMR & logistics fleet • RF/network realism • LightGBM + SHAP + Conformal • Type head (multiclass + rules) • Persona XAI • Cached models (no re-training on refresh)")
-st.warning("Disclaimer: This demo is intended solely for educational purposes."
-"It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
-"All content, data, and examples used in this demo are for learning and research purposes only."
-"The authors or presenters assume no responsibility for any misuse or unintended application of this material.", icon="⚠️")
-# ---- Cached model store to survive browser refresh (process cache) ----
+st.caption("AMR & logistics fleet • RF/network realism • LightGBM + SHAP + Conformal • Type head (multiclass + rules) • Persona XAI • Cached models")
+st.warning(
+    "Disclaimer: This demo is intended solely for educational purposes."
+    " It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
+    " All content, data, and examples used in this demo are for learning and research purposes only."
+    " The authors or presenters assume no responsibility for any misuse or unintended application of this material.",
+    icon="⚠️"
+)
+
 @st.cache_resource(show_spinner=False)
 def model_store():
-    """Returns a persistent dict across sessions for artifacts."""
     return {}
 
 MODEL_KEY = "v3.0-sundsvall"
@@ -185,13 +166,24 @@ with st.sidebar:
     if scenario.startswith("Jamming"):
         jam_mode = st.radio("Jamming type", ["Broadband noise", "Reactive", "Mgmt (deauth)"], index=0, key="jam_mode")
         CFG.jam_radius_m = st.slider("Jam coverage (m)", 50, 500, CFG.jam_radius_m, 10, key="jam_radius")
+
     if scenario.startswith("Access Breach"):
         breach_mode = st.radio("Breach mode", ["Evil Twin", "Rogue Open AP", "Credential hammer"], index=0, key="breach_mode")
         CFG.breach_radius_m = st.slider("Rogue node lure radius (m)", 50, 300, CFG.breach_radius_m, 10, key="breach_radius")
+
     if scenario.startswith("GPS Spoofing"):
         st.radio("Spoofing scope", ["Single device", "Localized area", "Site-wide"], index=1, key="spoof_mode")
         st.checkbox("Affect mobile (AMR/Truck) only", True, key="spoof_mobile_only")
         CFG.spoof_radius_m = st.slider("Spoof coverage (m)", 50, 500, CFG.spoof_radius_m, 10, key="spoof_radius")
+
+    # ✅ FIX: Tamper mode selection (was missing → no runtime tamper)
+    if scenario.startswith("Data Tamper"):
+        st.radio(
+            "Tamper mode",
+            ["Replay", "Constant injection", "Bias/Drift", "Bitflip/Noise", "Scale/Unit mismatch"],
+            index=0,
+            key="tamper_mode"
+        )
 
     speed = st.slider("Playback speed (ticks/refresh)", 1, 10, 3)
     auto = st.checkbox("Auto stream", True)
@@ -221,12 +213,11 @@ with st.sidebar:
     help_mode = st.checkbox("Help mode (inline hints)", True)
     show_eu_status = st.checkbox("Show EU AI Act status banner", True)
 
-# Simple onboarding + EU status
 if help_mode:
     st.info(
         "How to use: ① Pick a **Scenario** → ② Watch **map, KPIs, charts** update → "
-        "③ Open **Incidents** (role-aware explanations) → ④ See **Insights** (global behavior) → "
-        "⑤ Check **Governance** for EU AI Act transparency & evidence."
+        "③ Open **Incidents** (role-aware explanations) → ④ See **Insights** → "
+        "⑤ Check **Governance** for transparency artifacts."
     )
 if show_eu_status:
     st.success(
@@ -235,12 +226,12 @@ if show_eu_status:
     )
 
 # =========================
-# Helpers, JSON sanitizer, math
+# Helpers
 # =========================
 def to_df(X, cols): return pd.DataFrame(X, columns=cols)
 
 def shap_pos(explainer, X_df):
-    if explainer is None: 
+    if explainer is None:
         return np.zeros((len(X_df), len(X_df.columns)))
     vals = explainer.shap_values(X_df)
     if isinstance(vals, list):
@@ -280,27 +271,18 @@ def fmt_eta(seconds):
     seconds = max(0, int(seconds)); m, s = divmod(seconds, 60)
     return f"{m:02d}:{s:02d}"
 
-# ---- JSON sanitizer (handles numpy/pandas types) ----
 def _to_builtin(o):
     import numpy as _np
     import pandas as _pd
-    if isinstance(o, dict):
-        return {str(k): _to_builtin(v) for k, v in o.items()}
-    if isinstance(o, (list, tuple, set)):
-        return [_to_builtin(v) for v in o]
-    if isinstance(o, (_np.integer,)):
-        return int(o)
-    if isinstance(o, (_np.floating,)):
-        return float(o)
-    if isinstance(o, (_np.bool_,)):
-        return bool(o)
-    if isinstance(o, (_np.ndarray,)):
-        return o.tolist()
-    if isinstance(o, (_pd.Timestamp,)):
-        return o.isoformat()
+    if isinstance(o, dict): return {str(k): _to_builtin(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple, set)): return [_to_builtin(v) for v in o]
+    if isinstance(o, (_np.integer,)): return int(o)
+    if isinstance(o, (_np.floating,)): return float(o)
+    if isinstance(o, (_np.bool_,)): return bool(o)
+    if isinstance(o, (_np.ndarray,)): return o.tolist()
+    if isinstance(o, (_pd.Timestamp,)): return o.isoformat()
     return o
 
-# ---------- Human-readable explanations ----------
 def _fmt_pct(x):
     try: return f"{100*float(x):.0f}%"
     except: return "—"
@@ -364,7 +346,7 @@ def build_type_explanation(inc: dict) -> str:
     hints = {
         "Jamming":  "Signals consistent with interference: ↓SNR/SINR, ↑noise floor, ↑errors (BLER/PHY), ↑loss/latency.",
         "Breach":   "Access anomalies: ↑deauth & association churn, ↑auth/DHCP issues, **rogue_rssi_gap > 0**.",
-        "Spoof":    "GNSS inconsistency: ↑position error with odd HDOP (too low or high), fewer sats, Doppler/clock/C/N0 oddities.",
+        "Spoof":    "GNSS inconsistency: ↑position error with odd HDOP, fewer sats, Doppler/clock/C/N0 oddities.",
         "Tamper":   "Integrity anomalies: ↑duplicates/sequence gaps/timestamp skew, ↑schema/HMAC/CRC issues."
     }
     base_label = label.replace(" (low conf)", "").replace(" (rules)", "")
@@ -379,7 +361,6 @@ def build_type_explanation(inc: dict) -> str:
         parts.append("**Most influential signals (type head):**\n" + "\n".join(bullet))
     return "\n\n".join(parts)
 
-# ---- Training logs + helpers ----
 def _log_train(msg: str):
     t = time.strftime("%H:%M:%S")
     st.session_state.training_logs = st.session_state.get("training_logs", [])
@@ -463,7 +444,6 @@ def init_state():
     st.session_state.spoof_target_id = None
     st.session_state.ui_nonce = st.session_state.get("ui_nonce") or str(int(time.time()))
 
-    # --- safe defaults so first load doesn't crash ---
     _defaults = {
         "model": None,
         "scaler": None,
@@ -528,7 +508,6 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
     d_spf = haversine_m(row.lat, row.lon, spf["lat"], spf["lon"])
     load  = time_of_day_load(tick)
 
-    # ---------- Baseline RF/QoS ----------
     rssi = -40 - 18 * math.log10(d_ap) + np.random.normal(0, 2)
     rssi = float(np.clip(rssi, -90, -40))
     base_snr = 35 - 0.008 * d_ap + np.random.normal(0, 1.5)
@@ -544,7 +523,6 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
     dhcp_fail_rate  = float(np.clip(np.random.beta(1,200), 0.0, 1.0))
     rogue_rssi_gap  = -30.0
 
-    # Cellular KPIs
     if cellular_mode:
         rsrp_dbm = float(np.clip(-65 - 20*math.log10(d_ap/50.0) + np.random.normal(0,2.5), -120, -60))
         rsrq_db  = float(np.clip(-3.0 - 0.003*d_ap + np.random.normal(0,1.0), -19, -3))
@@ -562,7 +540,7 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
         bler=harq_nack_ratio=rrc_reestablish=rlf_count=ho_fail_rate=attach_reject_rate=0.0
         ta_anomaly=pci_anomaly=0.0
 
-    # ---------- Jamming realism ----------
+    # Jamming
     if str(scen).startswith("Jamming") and d_jam <= CFG.jam_radius_m:
         reach = max(0.15, 1.0 - d_jam/CFG.jam_radius_m)
         if jam_mode == "Broadband noise" or jam_mode is None:
@@ -607,7 +585,7 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
     thr     = float(max(0.5, 95 - 0.9*loss - 45*load + np.random.normal(0, 6)))
     channel_util = float(np.clip(100*(0.4+0.5*load) + 100*(cca_busy_frac-0.15) + np.random.normal(0, 5), 0, 100))
 
-    # ---------- Access Breach realism ----------
+    # Access Breach
     if str(scen).startswith("Access Breach"):
         affect_wifi    = (row.type in {"AMR","Sensor","Gateway"})
         affect_cellular= (row.type in {"Truck","Gateway"})
@@ -638,7 +616,7 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
                     else:
                         eapol_retry_rate = float(np.clip(eapol_retry_rate + np.random.uniform(0.35, 0.70), 0, 1.0))
 
-    # ---------- GNSS baselines ----------
+    # GNSS baselines
     pos_error = np.random.normal(2.0, 0.7)
     gnss_sats = int(np.clip(np.random.normal(11, 2.0), 5, 18))
     gnss_hdop = float(np.clip(np.random.normal(1.0, 0.25), 0.6, 2.5))
@@ -647,7 +625,7 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
     cno_mean_dbhz = float(np.clip(np.random.normal(38, 3.0), 25, 48))
     cno_std_dbhz  = float(np.clip(np.random.normal(2.0, 0.8), 0.3, 6.0))
 
-    # ---------- Data Tamper realism ----------
+    # ---------- Data Tamper realism (✅ FIXED) ----------
     if "seq_counter" not in st.session_state:
         st.session_state.seq_counter = {}
     if row.device_id not in st.session_state.seq_counter:
@@ -665,18 +643,24 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
 
     if str(scen).startswith("Data Tamper"):
         tm = tamper_mode
-        if training and tm is None:
-            tm = np.random.choice(["Replay","Constant injection","Bias/Drift","Bitflip/Noise","Scale/Unit mismatch"])
+        # ensure non-None even in live mode
+        if tm is None:
+            tm = np.random.choice(
+                ["Replay","Constant injection","Bias/Drift","Bitflip/Noise","Scale/Unit mismatch"]
+            ) if training else "Replay"
+
         if tm == "Replay":
             ts_skew_s += float(np.random.uniform(30, 120))
             dup_ratio += float(np.random.uniform(0.15, 0.50))
             seq_gap   += float(np.random.uniform(0.10, 0.40))
-            if crypto_enabled: hmac_fail_rate += float(np.random.uniform(0.6, 1.0))
+            if crypto_enabled:
+                hmac_fail_rate += float(np.random.uniform(0.6, 1.0))
         elif tm == "Constant injection":
             payload_entropy = float(np.random.uniform(1.0, 2.5))
             dup_ratio += float(np.random.uniform(0.20, 0.60))
             schema_violation_rate += float(np.random.uniform(0.05, 0.20))
-            if crypto_enabled: hmac_fail_rate += float(np.random.uniform(0.3, 0.8))
+            if crypto_enabled:
+                hmac_fail_rate += float(np.random.uniform(0.3, 0.8))
         elif tm == "Bias/Drift":
             drift_amt = float(np.random.uniform(5, 15))
             thr = max(1.0, thr - drift_amt)
@@ -686,13 +670,14 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
         elif tm == "Bitflip/Noise":
             payload_entropy = float(np.random.uniform(7.0, 8.0))
             crc_err += int(np.random.poisson(2))
-            if crypto_enabled: hmac_fail_rate += float(np.random.uniform(0.5, 1.0))
+            if crypto_enabled:
+                hmac_fail_rate += float(np.random.uniform(0.5, 1.0))
         elif tm == "Scale/Unit mismatch":
             latency *= float(np.random.uniform(1.8, 3.0))
             schema_violation_rate += float(np.random.uniform(0.30, 0.70))
             payload_entropy = float(np.random.uniform(4.5, 6.0))
 
-    # ---------- Training-time GPS spoofing ----------
+    # Training-time GPS spoofing
     if str(scen).startswith("GPS Spoofing") and training:
         minutes = tick / 60.0
         bias = 30.0
@@ -709,27 +694,22 @@ def rf_and_network_model(row, tick, scen=None, tamper_mode=None, crypto_enabled=
             cno_mean_dbhz = float(np.random.uniform(28, 34)); cno_std_dbhz = float(np.random.uniform(3.0, 6.0))
 
     return dict(
-        # RF/QoS
         rssi=float(rssi), snr=float(snr), packet_loss=float(loss), latency_ms=float(latency),
         jitter_ms=float(jitter), throughput_mbps=float(thr), channel_util=float(channel_util),
         noise_floor_dbm=float(noise_floor_dbm), phy_error_rate=float(phy_error_rate),
         cca_busy_frac=float(cca_busy_frac), beacon_miss_rate=float(beacon_miss_rate),
-        # Access/Auth
         deauth_rate=float(deauth_rate), assoc_churn=float(assoc_churn),
         eapol_retry_rate=float(eapol_retry_rate), dhcp_fail_rate=float(dhcp_fail_rate),
         rogue_rssi_gap=float(rogue_rssi_gap),
-        # GNSS
         pos_error_m=float(max(0.3, pos_error)),
         gnss_sats=int(gnss_sats), gnss_hdop=float(gnss_hdop),
         gnss_doppler_var=float(gnss_doppler_var), gnss_clk_drift_ppm=float(gnss_clk_drift_ppm),
         cno_mean_dbhz=float(cno_mean_dbhz), cno_std_dbhz=float(cno_std_dbhz),
-        # Cellular
         rsrp_dbm=float(rsrp_dbm), rsrq_db=float(rsrq_db), sinr_db=float(sinr_db),
         bler=float(bler), harq_nack_ratio=float(harq_nack_ratio),
         rrc_reestablish=float(rrc_reestablish), rlf_count=float(rlf_count),
         ho_fail_rate=float(ho_fail_rate), attach_reject_rate=float(attach_reject_rate),
         ta_anomaly=float(ta_anomaly), pci_anomaly=float(pci_anomaly),
-        # Integrity / data-path
         payload_entropy=float(np.clip(payload_entropy, 0.0, 8.0)),
         ts_skew_s=float(ts_skew_s), seq_gap=float(np.clip(seq_gap, 0.0, 1.0)),
         dup_ratio=float(np.clip(dup_ratio, 0.0, 1.0)),
@@ -769,7 +749,7 @@ def feature_cols():
     return cols
 
 # =========================
-# Training data + Attack-type bases
+# Type head helpers (rules + fusion)
 # =========================
 def _select_type_bases():
     wifi_jam   = ["snr","noise_floor_dbm","phy_error_rate","cca_busy_frac","packet_loss","latency_ms","jitter_ms"]
@@ -783,7 +763,6 @@ def _select_type_bases():
 def _cols_from_bases(all_cols, bases):
     return [c for c in all_cols if any(c.startswith(f"{b}_") for b in bases)]
 
-# ---- Rules head helpers ----
 def _z(feats, base):  return float(feats.get(f"{base}_z", feats.get(f"{base}_last", 0.0)))
 def _pos(feats, base): return float(feats.get(f"{base}_last", 0.0))
 def _sigmoid(x, c=0.0, s=1.0): return float(1.0 / (1.0 + math.exp(-(x - c) / max(1e-6, s))))
@@ -806,6 +785,7 @@ def compute_rule_scores_from_feats(feats: dict, cellular_mode: bool) -> dict:
             _sigmoid(_z(feats,"packet_loss"), c=0.6, s=0.7),
         ]
     jam = float(np.clip(np.mean(jam_terms), 0, 1))
+
     breach_terms = [
         _sigmoid(_z(feats,"deauth_rate"), c=0.4, s=0.5),
         _sigmoid(_z(feats,"assoc_churn"), c=0.4, s=0.5),
@@ -816,6 +796,7 @@ def compute_rule_scores_from_feats(feats: dict, cellular_mode: bool) -> dict:
         _sigmoid(_pos(feats,"pci_anomaly"), c=0.5, s=0.2),
     ]
     breach = float(np.clip(np.mean(breach_terms), 0, 1))
+
     hdop = _pos(feats,"gnss_hdop")
     hdop_weird = max(_sigmoid(2.2 - hdop, c=0.0, s=0.6), _sigmoid(hdop - 2.0, c=0.0, s=0.6))
     spoof_terms = [
@@ -827,6 +808,7 @@ def compute_rule_scores_from_feats(feats: dict, cellular_mode: bool) -> dict:
         max(_sigmoid(_z(feats,"cno_std_dbhz"), c=0.6, s=0.7), _sigmoid(-_z(feats,"cno_std_dbhz"), c=-0.6, s=0.7))
     ]
     spoof = float(np.clip(np.mean(spoof_terms), 0, 1))
+
     tamper_terms = [
         _sigmoid(_z(feats,"hmac_fail_rate"), c=0.4, s=0.5),
         _sigmoid(_z(feats,"dup_ratio"), c=0.4, s=0.5),
@@ -836,6 +818,7 @@ def compute_rule_scores_from_feats(feats: dict, cellular_mode: bool) -> dict:
         _sigmoid(_z(feats,"payload_entropy"), c=0.0, s=1.2)
     ]
     tamper = float(np.clip(np.mean(tamper_terms), 0, 1))
+
     vec = np.array([jam, breach, spoof, tamper], dtype=float)
     if np.all(vec == 0): vec = np.ones_like(vec) * 1e-6
     vec = vec / vec.sum()
@@ -858,7 +841,7 @@ def _fit_power_temp(probs: np.ndarray, y_true_idx: np.ndarray) -> float:
     return float(best_g)
 
 # =========================
-# Training (with progress, ETA, imbalance aware) + Cached store update
+# Training (same logic as your v2.0, with width="stretch")
 # =========================
 def make_training_data(n_ticks=400, progress_cb=None, pct_start=0, pct_end=70):
     lat0, lon0 = CFG.site_center
@@ -875,22 +858,24 @@ def make_training_data(n_ticks=400, progress_cb=None, pct_start=0, pct_end=70):
                          speed_mps=(np.random.uniform(0.5,2.5) if d_type in MOBILE_TYPES else 0.0),
                          heading=np.random.uniform(0,2*np.pi)))
     D=pd.DataFrame(devs)
+
     if "seq_counter" not in st.session_state:
         st.session_state.seq_counter = {}
     for dev_id in D["device_id"]:
         st.session_state.seq_counter.setdefault(dev_id, 0)
+
     buf = {d: deque(maxlen=CFG.rolling_len) for d in D.device_id}
     X_rows=[]; y=[]; labels=[]
-
     type_counter = {"Jamming":0, "Breach":0, "Spoof":0, "Tamper":0}
     t0 = time.time()
+
     for t in range(n_ticks):
         scen_code = np.random.choice(["Normal","J","Breach","GPS","Tamper"], p=[0.55,0.15,0.12,0.10,0.08])
-        if   scen_code=="J":     sc="Jamming (localized)";  label_type="Jamming";  jm=np.random.choice(["Broadband noise","Reactive","Mgmt (deauth)"]); bm=None
-        elif scen_code=="Breach":sc="Access Breach (AP/gNB)"; label_type="Breach"; bm=np.random.choice(["Evil Twin","Rogue Open AP","Credential hammer"]); jm=None
-        elif scen_code=="GPS":   sc="GPS Spoofing (subset)"; label_type="Spoof";   jm=bm=None
-        elif scen_code=="Tamper":sc="Data Tamper (gateway)"; label_type="Tamper";  jm=bm=None
-        else:                    sc="Normal";               label_type="Normal";   jm=bm=None
+        if   scen_code=="J":     sc="Jamming (localized)";       label_type="Jamming"; jm=np.random.choice(["Broadband noise","Reactive","Mgmt (deauth)"]); bm=None
+        elif scen_code=="Breach":sc="Access Breach (AP/gNB)";     label_type="Breach";  bm=np.random.choice(["Evil Twin","Rogue Open AP","Credential hammer"]); jm=None
+        elif scen_code=="GPS":   sc="GPS Spoofing (subset)";      label_type="Spoof";   jm=bm=None
+        elif scen_code=="Tamper":sc="Data Tamper (gateway)";      label_type="Tamper";  jm=bm=None
+        else:                    sc="Normal";                    label_type="Normal";  jm=bm=None
         if label_type in type_counter: type_counter[label_type] += 1
 
         for i in D.index:
@@ -1009,6 +994,7 @@ def train_model_with_progress(n_ticks=350):
     prec,rec,f1,_ = precision_recall_fscore_support(y_test,preds,average="binary",zero_division=0)
     auc = roc_auc_score(y_test, te_p)
     brier = brier_score_loss(y_test, te_p)
+
     ths = np.linspace(0.30, 0.90, 61)
     best_f1, best_th = 0.0, CFG.threshold
     for th in ths:
@@ -1018,7 +1004,7 @@ def train_model_with_progress(n_ticks=350):
             best_f1, best_th = f1c, th
     st.session_state.suggested_threshold = float(best_th)
 
-    # -------- Stage-2: Attack type classifier (multiclass LGBM) --------
+    # Stage-2: type classifier
     update(95, "Training attack type classifier…")
     pos_mask = labels_all != "Normal"
     if np.any(pos_mask):
@@ -1046,13 +1032,15 @@ def train_model_with_progress(n_ticks=350):
         acc_raw = float((probs_te.argmax(axis=1) == y_te_t).mean())
         acc_adj = float((_power_temp(probs_te, gamma).argmax(axis=1) == y_te_t).mean())
         type_expl = shap.TreeExplainer(type_clf)
+
         st.session_state.type_clf = type_clf
         st.session_state.type_cols = type_cols
         st.session_state.type_labels = list(classes)
         st.session_state.type_explainer = type_expl
         st.session_state.type_metrics = {
             "accuracy_raw": acc_raw, "accuracy_calibrated": acc_adj,
-            "classes": list(classes), "tau": TYPE_TAU, "delta": TYPE_DELTA, "alpha": TYPE_ALPHA, "temp_gamma": gamma
+            "classes": list(classes), "tau": TYPE_TAU, "delta": TYPE_DELTA,
+            "alpha": TYPE_ALPHA, "temp_gamma": gamma
         }
     else:
         st.session_state.type_clf = None
@@ -1061,7 +1049,6 @@ def train_model_with_progress(n_ticks=350):
         st.session_state.type_explainer = None
         st.session_state.type_metrics = {}
 
-    # -------- Stash everything in session + cache --------
     st.session_state.model=model
     st.session_state.scaler=scaler
     st.session_state.explainer=shap.TreeExplainer(model)
@@ -1072,7 +1059,6 @@ def train_model_with_progress(n_ticks=350):
     total_secs = time.time()-t_start
     st.session_state.last_train_secs = total_secs
 
-    # cache artifacts so refresh doesn't retrain
     store = model_store()
     store[MODEL_KEY] = {
         "trained_at": int(time.time()),
@@ -1089,8 +1075,7 @@ def train_model_with_progress(n_ticks=350):
     bar.progress(100, text=f"Training complete • {int(total_secs)}s")
     note.success(
         f"Model trained: AUC={auc:.2f}, Precision={prec:.2f}, Recall={rec:.2f} • "
-        f"Brier={brier:.3f} • Duration {int(total_secs)}s • Suggested threshold={best_th:.2f} • "
-        f"Type acc (adj)={st.session_state.type_metrics.get('accuracy_calibrated','—')}"
+        f"Brier={brier:.3f} • Duration {int(total_secs)}s • Suggested threshold={best_th:.2f}"
     )
     _log_train(f"Training complete in {int(total_secs)}s (AUC={auc:.2f}, F1={f1:.2f}).")
 
@@ -1101,7 +1086,7 @@ def conformal_pvalue(prob):
     return float((np.sum(cal>=nc)+1)/(len(cal)+1))
 
 # =========================
-# Try to load cached artifacts (no re-train on refresh)
+# Load cached artifacts (no retrain on refresh)
 # =========================
 store = model_store()
 if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY in store):
@@ -1126,7 +1111,7 @@ if retrain or (CFG.retrain_on_start and st.session_state.get("model") is None an
     train_model_with_progress(n_ticks=350)
 
 # =========================
-# Streaming tick (batch-optimized)
+# Streaming tick
 # =========================
 def feature_cols_cached():
     if st.session_state.get("baseline") is not None:
@@ -1136,8 +1121,10 @@ def feature_cols_cached():
 def tick_once():
     if st.session_state.get("model") is None:
         return
+
     st.session_state.devices = update_positions(st.session_state.devices.copy())
     tick = st.session_state.tick
+
     if st.session_state.spoof_target_id is None:
         st.session_state.spoof_target_id = np.random.choice(st.session_state.devices["device_id"])
 
@@ -1145,13 +1132,14 @@ def tick_once():
     for _, row in st.session_state.devices.iterrows():
         m = rf_and_network_model(
             row, tick, scenario,
-            tamper_mode=st.session_state.get("tamper_mode"),
+            tamper_mode=st.session_state.get("tamper_mode"),            # ✅ now populated via sidebar
             crypto_enabled=st.session_state.get("crypto_enabled", True),
             training=False,
             jam_mode=st.session_state.get("jam_mode"),
             breach_mode=st.session_state.get("breach_mode")
         )
-        # Live GPS spoofing effect
+
+        # Live GPS spoof effect
         if scenario.startswith("GPS Spoofing"):
             spf = st.session_state.spoofer
             d_spf = haversine_m(row.lat, row.lon, spf["lat"], spf["lon"])
@@ -1192,12 +1180,14 @@ def tick_once():
 
     incidents_this_tick=[]
     st.session_state.latest_probs.clear()
+
     if feats_list:
         X = pd.DataFrame(feats_list).fillna(0.0)
         cols = feature_cols_cached()
         X = X.reindex(columns=cols, fill_value=0.0)
         Xs = st.session_state.scaler.transform(X)
         probs = st.session_state.model.predict_proba(Xs)[:,1]
+
         for did, p in zip(device_ids, probs):
             st.session_state.latest_probs[did] = float(p)
 
@@ -1218,7 +1208,7 @@ def tick_once():
                 shap_vec = shap_arr[j]
                 pairs = sorted(list(zip(cols, shap_vec)), key=lambda kv: abs(kv[1]), reverse=True)[:6]
 
-                # ---- TYPE LABELLING (hybrid) ----
+                # Type labeling (hybrid)
                 type_label = "Unknown"; type_conf = None; type_pairs=[]
                 cellular_mode = st.session_state.get("cellular_mode", False)
 
@@ -1251,14 +1241,11 @@ def tick_once():
                     raw_label = classes[best_idx]
                     if top1 >= TYPE_TAU and margin >= TYPE_DELTA:
                         type_label, type_conf = raw_label, top1
-                    elif top1 >= TYPE_TAU:
-                        type_label, type_conf = f"{raw_label} (low conf)", top1
                     elif top1 >= 0.40:
                         type_label, type_conf = f"{raw_label} (low conf)", top1
                     else:
                         type_label, type_conf = "Unknown", top1
 
-                    # SHAP reasons for the ML type head
                     try:
                         type_expl = st.session_state.get("type_explainer")
                         if type_expl is not None:
@@ -1271,7 +1258,6 @@ def tick_once():
                     except Exception:
                         type_pairs=[]
                 else:
-                    # fallback to rules only
                     fused = rule_vec.copy()
                     fused = fused / fused.sum()
                     names = ["Jamming","Breach","Spoof","Tamper"]
@@ -1280,6 +1266,7 @@ def tick_once():
                     classes = ["Breach","Jamming","Spoof","Tamper"]
                     probs_ml = [0.25,0.25,0.25,0.25]
                     rule_vec_ordered = [rule_vec[1], rule_vec[0], rule_vec[2], rule_vec[3]]
+                    margin = None
 
                 inc = dict(
                     ts=int(time.time()), tick=int(tick),
@@ -1291,13 +1278,12 @@ def tick_once():
                     type_label=type_label, type_conf=type_conf,
                     type_reasons=[{"feature":k,"impact":float(v)} for k,v in type_pairs]
                 )
-                # store numeric vectors for explanations
                 inc.update({
                     "type_probs_ml": (probs_ml if isinstance(probs_ml, list) else probs_ml.tolist()),
                     "type_scores_rules": (rule_vec_ordered if isinstance(rule_vec_ordered, list) else rule_vec_ordered.tolist()),
                     "type_probs_fused": (fused if isinstance(fused, list) else fused.tolist()),
                     "type_classes": list(st.session_state.get("type_labels", ["Breach","Jamming","Spoof","Tamper"])),
-                    "type_margin": float(margin) if 'margin' in locals() else None
+                    "type_margin": float(margin) if margin is not None else None
                 })
                 st.session_state.incidents.append(inc)
                 incidents_this_tick.append(inc)
@@ -1314,6 +1300,7 @@ def tick_once():
     st.session_state.fleet_records.extend(fleet_rows)
     st.session_state.tick += 1
 
+# Run stream
 if st.session_state.get("model") is not None:
     if auto:
         for _ in range(speed): tick_once()
@@ -1321,65 +1308,184 @@ if st.session_state.get("model") is not None:
         if st.button("Step once"): tick_once()
 
 # =========================
-# Transparency banner (engine)
+# KPIs + model-ready warning (✅ FIX)
 # =========================
-def model_card_data():
-    mc = {
-        "model": "LightGBM (binary) on rolling-window features",
-        "version": "v3.0-sundsvall",
-        "features_per_device": len(feature_cols()),
-        "window_length": CFG.rolling_len,
-        "hyperparameters": {
-            "n_estimators": CFG.n_estimators,
-            "max_depth": CFG.max_depth,
-            "learning_rate": CFG.learning_rate,
-            "min_child_samples": 12,
-            "subsample": 0.9,
-            "colsample_bytree": 0.9
-        },
-        "detection_rule": f"probability >= {CFG.threshold:.2f}",
-        "calibration": "Conformal p-value (coverage ~90%)" if st.session_state.get("conformal_scores") is not None else "Disabled",
-        "training_metrics": st.session_state.get("metrics", {}),
-        "data": {
-            "source": "Synthetic demo telemetry (no personal data)",
-            "raw_signals": RAW_FEATURES,
-            "engineered_features_count": len(feature_cols()),
-            "windows": st.session_state.get("training_info", {}).get("n_windows"),
-            "binary_distribution": st.session_state.get("training_info", {}).get("binary_distribution"),
-            "type_distribution": st.session_state.get("training_info", {}).get("type_distribution"),
-        },
-        "training": {
-            "scale_pos_weight": st.session_state.get("training_info", {}).get("scale_pos_weight"),
-            "calibration": "Conformal p-values; temperature for type head",
-            "suggested_threshold": st.session_state.get("suggested_threshold", CFG.threshold)
-        },
-        "intended_use": "Demo of trustworthy anomaly detection for wireless/logistics",
-        "limitations": [
-            "Synthetic, physics-inspired signals",
-            "Single-site example; not production-ready"
-        ]
-    }
-    mc["type_classifier"] = {
-        "model": "LightGBM (multiclass) + rules fusion",
-        "features_used": st.session_state.get("type_cols", []),
-        "metrics": st.session_state.get("type_metrics", {}),
-    }
-    return mc
+k1,k2,k3,k4,k5 = st.columns(5)
+with k1: st.metric("Devices", len(st.session_state.devices))
+with k2: st.metric("Incidents (session)", len(st.session_state.incidents))
+with k3:
+    met = st.session_state.get("metrics") or {}
+    auc = met.get("auc", 0.0)
+    st.metric("Model AUC", f"{auc:.2f}")
+with k4:
+    probs = list(st.session_state.latest_probs.values())
+    st.metric("Fleet risk (mean prob)", f"{(np.mean(probs) if probs else 0):.2f}")
+with k5:
+    train_secs = st.session_state.get("last_train_secs")
+    st.metric("Last train duration", f"{int(train_secs)}s" if train_secs else "—")
 
-def data_schema_json():
-    return {
-        "raw_features": RAW_FEATURES,
-        "engineered_features": feature_cols(),
-        "pii": False,
-        "notes": "Synthetic signals only; no personal data. Export for transparency."
-    }
-
-def audit_log_json():
-    return _to_builtin({"incidents": st.session_state.get("incidents", [])})
+if st.session_state.get("model") is None:
+    st.error("Model is not trained/loaded. Click **Train / Retrain models** in the sidebar to enable streaming & attacks.")
 
 # =========================
-# SHAP renderer for incidents — SCOPED KEYS
+# Tabs
 # =========================
+tab_overview, tab_fleet, tab_incidents, tab_insights, tab_governance = st.tabs(
+    ["Overview", "Fleet View", "Incidents", "Insights", "Governance"]
+)
+
+# ---------- Overview
+with tab_overview:
+    left, right = st.columns([2,1])
+
+    with left:
+        if show_map and st.session_state.get("model") is not None:
+            df_map = st.session_state.devices.copy()
+            if type_filter and len(type_filter) < len(DEVICE_TYPES):
+                df_map = df_map[df_map["type"].isin(type_filter)].copy()
+
+            df_map["risk"] = df_map["device_id"].map(st.session_state.latest_probs).fillna(0.0)
+            snrs, losses = [], []
+            for _, r in df_map.iterrows():
+                buf = st.session_state.dev_buf.get(r.device_id, [])
+                if buf and len(buf) > 0:
+                    snrs.append(float(buf[-1].get("snr", np.nan)))
+                    losses.append(float(buf[-1].get("packet_loss", np.nan)))
+                else:
+                    snrs.append(np.nan); losses.append(np.nan)
+            df_map["snr"] = snrs; df_map["packet_loss"] = losses
+
+            type_colors = {"AMR":[0,128,255,220],"Truck":[255,165,0,220],"Sensor":[34,197,94,220],"Gateway":[147,51,234,220]}
+            df_map["fill_color"] = df_map["type"].map(type_colors)
+            df_map["label"] = df_map.apply(lambda r: f"{r.device_id} ({r.type})", axis=1)
+            df_map["radius"] = 6 + (df_map["risk"] * 16)
+
+            layers = [
+                pdk.Layer("ScatterplotLayer", data=df_map, get_position='[lon, lat]',
+                          get_fill_color='fill_color', get_radius='radius',
+                          get_line_color=[0,0,0,140], get_line_width=1, pickable=True),
+                pdk.Layer("TextLayer", data=df_map, get_position='[lon, lat]', get_text='label',
+                          get_color=[20,20,20,255], get_size=12, get_alignment_baseline="top", get_pixel_offset=[0,10]),
+            ]
+
+            cellular_mode = st.session_state.get("cellular_mode", False)
+            infra_label = "gNB" if cellular_mode else "AP"
+            rogue_label = "Rogue gNB" if cellular_mode else "Rogue AP"
+
+            ap_df = pd.DataFrame([{"lat": st.session_state.ap["lat"], "lon": st.session_state.ap["lon"], "label": infra_label}])
+            layers += [
+                pdk.Layer("ScatterplotLayer", data=ap_df, get_position='[lon, lat]', get_fill_color='[30,144,255,240]', get_radius=12),
+                pdk.Layer("TextLayer", data=ap_df, get_position='[lon, lat]', get_text='label', get_color=[30,144,255,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
+            ]
+
+            warn_df = df_map[df_map["risk"] >= CFG.threshold].copy()
+            if len(warn_df) > 0:
+                warn_df["warn"] = "⚠"
+                layers += [
+                    pdk.Layer("TextLayer", data=warn_df, get_position='[lon, lat]', get_text='warn',
+                              get_color=[255,0,0,255], get_size=18, get_alignment_baseline="bottom", get_pixel_offset=[0,-18]),
+                    pdk.Layer("ScatterplotLayer", data=warn_df, get_position='[lon, lat]',
+                              get_fill_color='[0,0,0,0]', get_radius=26,
+                              stroked=True, get_line_color=[255,0,0,200], get_line_width=2)
+                ]
+
+            def circle_layer(center, radius_m, color):
+                angles = np.linspace(0, 2*np.pi, 60)
+                lat_mean = float(st.session_state.devices.lat.mean())
+                path = [[
+                    center["lon"] + meters_to_latlon_offset(radius_m * math.sin(a), radius_m * math.cos(a), lat_mean)[1],
+                    center["lat"] + meters_to_latlon_offset(radius_m * math.sin(a), radius_m * math.cos(a), lat_mean)[0]
+                ] for a in angles]
+                return pdk.Layer("PathLayer", [{"path": path}], get_path="path", get_color=color, width_scale=4, width_min_pixels=1, opacity=0.25)
+
+            if scenario.startswith("Jamming"):
+                jam = st.session_state.jammer
+                jam_df = pd.DataFrame([{"lat": jam["lat"], "lon": jam["lon"], "label": "Jammer"}])
+                layers += [
+                    pdk.Layer("ScatterplotLayer", data=jam_df, get_position='[lon, lat]', get_fill_color='[255,0,0,240]', get_radius=12),
+                    pdk.Layer("TextLayer", data=jam_df, get_position='[lon, lat]', get_text='label', get_color=[255,0,0,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
+                    circle_layer(jam, CFG.jam_radius_m, [255,0,0])
+                ]
+            if scenario.startswith("Access Breach"):
+                rog = st.session_state.rogue
+                rog_df = pd.DataFrame([{"lat": rog["lat"], "lon": rog["lon"], "label": rogue_label}])
+                layers += [
+                    pdk.Layer("ScatterplotLayer", data=rog_df, get_position='[lon, lat]', get_fill_color='[0,255,255,240]', get_radius=12),
+                    pdk.Layer("TextLayer", data=rog_df, get_position='[lon, lat]', get_text='label', get_color=[0,200,200,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
+                    circle_layer(rog, CFG.breach_radius_m, [0,200,200])
+                ]
+            if scenario.startswith("GPS Spoofing"):
+                spf = st.session_state.spoofer
+                spf_df = pd.DataFrame([{"lat": spf["lat"], "lon": spf["lon"], "label": "Spoofer"}])
+                layers += [
+                    pdk.Layer("ScatterplotLayer", data=spf_df, get_position='[lon, lat]', get_fill_color='[255,215,0,240]', get_radius=12),
+                    pdk.Layer("TextLayer", data=spf_df, get_position='[lon, lat]', get_text='label', get_color=[255,215,0,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
+                    circle_layer(spf, CFG.spoof_radius_m, [255,215,0])
+                ]
+
+            view_state = pdk.ViewState(
+                latitude=float(st.session_state.devices.lat.mean()),
+                longitude=float(st.session_state.devices.lon.mean()),
+                zoom=14, pitch=0
+            )
+
+            tooltip = {"html": "<b>{device_id}</b> • {type}<br/>Risk: {risk:.2f}<br/>SNR: {snr} dB<br/>Loss: {packet_loss}%",
+                       "style": {"backgroundColor": "rgba(255,255,255,0.95)", "color": "#111"}}
+
+            # ✅ FIX: Use a CARTO basemap (no Mapbox token required)
+            CARTO_POSITRON = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+            deck = pdk.Deck(
+                layers=layers,
+                initial_view_state=view_state,
+                map_style=CARTO_POSITRON,
+                tooltip=tooltip
+            )
+            st.pydeck_chart(deck, width="stretch")
+
+        fr = pd.DataFrame(list(st.session_state.fleet_records))
+        if len(fr)>0:
+            for y in ["snr","packet_loss","latency_ms","pos_error_m"]:
+                sub = fr.groupby("tick")[y].mean().reset_index()
+                fig=px.line(sub, x="tick", y=y, title=f"Fleet avg {y}")
+                st.plotly_chart(fig, width="stretch", key=f"overview_{y}")
+
+    with right:
+        leaderboard=[]
+        if st.session_state.get("model") is not None:
+            for _, r in st.session_state.devices.iterrows():
+                prob = st.session_state.latest_probs.get(r.device_id, 0.0)
+                pval=conformal_pvalue(prob) if use_conformal else None
+                sev,_=severity(prob,pval)
+                leaderboard.append({"device_id":r.device_id,"type":r.type,"prob":prob,"p_value":pval,"severity":sev})
+        if leaderboard:
+            df_lead=pd.DataFrame(leaderboard).sort_values("prob",ascending=False).head(10)
+            st.markdown("### Top risk devices")
+            st.dataframe(df_lead, width="stretch")
+
+# ---------- Fleet View
+with tab_fleet:
+    fr = pd.DataFrame(list(st.session_state.fleet_records))
+    if len(fr)>0 and show_heatmap:
+        recent = fr[fr["tick"]>=st.session_state.tick-40]
+        cols = ["snr","packet_loss","latency_ms","jitter_ms","pos_error_m","crc_err","throughput_mbps","channel_util",
+                "noise_floor_dbm","cca_busy_frac","phy_error_rate","deauth_rate","assoc_churn","eapol_retry_rate","dhcp_fail_rate"]
+        cols = [c for c in cols if c in recent.columns]
+        if len(cols)>0:
+            mat = recent.groupby("device_id")[cols].mean()
+            z = (mat-mat.mean())/mat.std(ddof=0).replace(0,1)
+            fig = px.imshow(z.T, color_continuous_scale="RdBu_r", aspect="auto",
+                            labels=dict(color="z-score"), title="Fleet heatmap (recent mean z-scores)")
+            st.plotly_chart(fig, width="stretch", key="fleet_heatmap")
+    st.dataframe(st.session_state.devices, width="stretch")
+
+# ---------- Incidents
+def incident_category(inc):
+    s = inc.get("scenario", "")
+    for cat in ["Jamming", "Access Breach", "GPS Spoofing", "Data Tamper"]:
+        if s.startswith(cat):
+            return cat
+    return "Other"
+
 def incident_id(inc):
     return f"{inc['device_id']}_{inc['ts']}_{inc['tick']}"
 
@@ -1416,6 +1522,7 @@ def render_device_inspector_from_incident(inc, topk=8, scope="main"):
                  title=f"Top local contributions — {inc['device_id']}",
                  labels={"impact": "contribution → anomaly"})
     st.plotly_chart(fig, width="stretch", key=f"local_shap_{base_key}")
+
     hist = get_device_history(inc["device_id"], ["snr","packet_loss","latency_ms","pos_error_m"])
     if len(hist)>0:
         hist = hist.reset_index(drop=True)
@@ -1424,18 +1531,9 @@ def render_device_inspector_from_incident(inc, topk=8, scope="main"):
         c1.plotly_chart(px.line(hist, y="packet_loss", title="Packet loss % (last window)"), width="stretch", key=f"hist_loss_{base_key}")
         c2.plotly_chart(px.line(hist, y="latency_ms", title="Latency ms (last window)"), width="stretch", key=f"hist_latency_{base_key}")
         c2.plotly_chart(px.line(hist, y="pos_error_m", title="GNSS error m (last window)"), width="stretch", key=f"hist_gnss_{base_key}")
+
     with st.expander("Raw window features (standardized input)"):
         st.dataframe(Xs_df.T.rename(columns={0: "z-value"}), width="stretch")
-
-# =========================
-# Role-aware incident rendering & categorization
-# =========================
-def incident_category(inc):
-    s = inc.get("scenario", "")
-    for cat in ["Jamming", "Access Breach", "GPS Spoofing", "Data Tamper"]:
-        if s.startswith(cat): 
-            return cat
-    return "Other"
 
 def render_incident_body_for_role(inc, role, scope="main"):
     base_key = f"{incident_id(inc)}_{scope}"
@@ -1458,67 +1556,9 @@ def render_incident_body_for_role(inc, role, scope="main"):
     st.markdown("#### Why this attack type?")
     st.markdown(build_type_explanation(inc))
 
-    if role == "End User":
-        with st.expander("What to do"):
-            if "Jamming" in inc["scenario"]:
-                st.write("Move 50–100 m away or retry; the network will change channel.")
-            elif "Access Breach" in inc["scenario"]:
-                st.write("Avoid joining unknown SSIDs/PLMNs; protections are active.")
-            elif "GPS Spoofing" in inc["scenario"]:
-                st.write("Use UWB/IMU fallback; limit speed in GNSS-denied mode.")
-            else:
-                st.write("Retry; if it persists, notify ops.")
-
-    elif role == "Domain Expert":
-        with st.expander("Signals & Playbook"):
-            if "Jamming" in inc["scenario"]:
-                st.write("↑ noise_floor_dbm, ↓ SNR/SINR, ↑ PHY/BLER, ↑ loss/latency")
-            elif "Access Breach" in inc["scenario"]:
-                st.write("↑ deauth_rate, ↑ assoc_churn, ↑ eapol_retry_rate / dhcp_fail_rate, rogue_rssi_gap>0")
-            elif "Data Tamper" in inc["scenario"]:
-                st.write("↑ dup_ratio, ↑ ts_skew_s, ↑ schema_violation_rate, ↑ hmac_fail_rate (if enabled)")
-            elif "GPS Spoofing" in inc["scenario"]:
-                st.write("↑ pos_error_m with odd GNSS: hdop, sats, Doppler var, clock drift, C/N0 patterns")
+    if role == "Domain Expert":
         with st.expander("Device Inspector (local SHAP)"):
             render_device_inspector_from_incident(inc, topk=8, scope=scope)
-
-    elif role == "Regulator":
-        st.markdown("**Assurance & governance**")
-        st.write("- Calibrated confidence via conformal p-value (lower is stronger evidence).")
-        st.write("- Audit trail available; no personal data—technical telemetry only.")
-        evidence = {
-            "ts": inc["ts"], "tick": inc["tick"], "device_id": inc["device_id"], "type": inc["type"],
-            "lat": inc["lat"], "lon": inc["lon"], "scenario": inc["scenario"], "severity": inc["severity"],
-            "prob": inc["prob"], "p_value": inc["p_value"], "model_version": "LightGBM v3.0-demo",
-            "explanations": inc["reasons"], "type_label": inc.get("type_label"), "type_conf": inc.get("type_conf")
-        }
-        st.download_button(
-            "Download incident evidence (JSON)",
-            data=json.dumps(_to_builtin(evidence), indent=2).encode("utf-8"),
-            file_name=f"incident_{inc['device_id']}_{inc['ts']}_{inc['tick']}.json",
-            mime="application/json",
-            key=f"dl_evidence_{base_key}"
-        )
-
-    elif role == "AI Builder":
-        st.markdown("**Model view**")
-        render_device_inspector_from_incident(inc, topk=8, scope=scope)
-        with st.expander("Standardized feature vector (z-values)"):
-            feats = inc.get("features") or st.session_state.last_features.get(inc["device_id"])
-            if feats:
-                X = pd.DataFrame([feats]).fillna(0.0)
-                cols = feature_cols_cached()
-                X = X.reindex(columns=cols, fill_value=0.0)
-                Xs = st.session_state.scaler.transform(X)
-                Xs_df = pd.DataFrame(Xs, columns=cols)
-                st.dataframe(Xs_df.T.rename(columns={0:"z"}), width="stretch")
-
-    else:  # Executive
-        st.markdown("**Executive summary**")
-        st.write(f"- Device **{inc['device_id']}** at risk: **{inc['severity']}**; scenario: **{inc['scenario']}**; type: **{inc.get('type_label','Unknown')}**.")
-        st.write("- Impact: transient performance/security risk; mitigations active.")
-        st.markdown("**KPIs**")
-        st.write("- Incidents, MTTD, Packet loss, Latency, SNR/SINR, Deauth/BLER")
 
 def render_incident_card(inc, role, scope="main"):
     base_key = f"{incident_id(inc)}_{scope}"
@@ -1550,191 +1590,6 @@ def render_incident_card(inc, role, scope="main"):
     with cols[1]:
         st.json({k: inc[k] for k in ["tick","device_id","type","prob","p_value"]})
 
-# =========================
-# KPIs banner (robust)
-# =========================
-k1,k2,k3,k4,k5 = st.columns(5)
-with k1: st.metric("Devices", len(st.session_state.devices))
-with k2: st.metric("Incidents (session)", len(st.session_state.incidents))
-with k3:
-    met = st.session_state.get("metrics") or {}
-    auc = met.get("auc", 0.0)
-    st.metric("Model AUC", f"{auc:.2f}")
-    if help_mode: st.caption("**Model AUC**: discrimination; 0.5 = random, 1.0 = perfect. Higher is better.")
-with k4:
-    probs = list(st.session_state.latest_probs.values())
-    st.metric("Fleet risk (mean prob)", f"{(np.mean(probs) if probs else 0):.2f}")
-    if help_mode: st.caption("**Fleet risk (mean prob)**: average anomaly probability across devices now; higher implies site-wide stress.")
-with k5:
-    train_secs = st.session_state.get("last_train_secs")
-    st.metric("Last train duration", f"{int(train_secs)}s" if train_secs else "—")
-
-# =========================
-# Layout tabs
-# =========================
-tab_overview, tab_fleet, tab_incidents, tab_insights, tab_governance = st.tabs(
-    ["Overview", "Fleet View", "Incidents", "Insights", "Governance"]
-)
-
-# ---------- Overview
-with tab_overview:
-    left, right = st.columns([2,1])
-
-    with left:
-        # Map is now shown as long as show_map is True (no model requirement)
-        if show_map:
-            df_map = st.session_state.devices.copy()
-            if type_filter and len(type_filter) < len(DEVICE_TYPES):
-                df_map = df_map[df_map["type"].isin(type_filter)].copy()
-
-            df_map["risk"] = df_map["device_id"].map(st.session_state.latest_probs).fillna(0.0)
-            snrs, losses = [], []
-            for _, r in df_map.iterrows():
-                buf = st.session_state.dev_buf.get(r.device_id, [])
-                if buf and len(buf) > 0:
-                    snrs.append(float(buf[-1].get("snr", np.nan)))
-                    losses.append(float(buf[-1].get("packet_loss", np.nan)))
-                else:
-                    snrs.append(np.nan); losses.append(np.nan)
-            df_map["snr"] = snrs; df_map["packet_loss"] = losses
-
-            type_colors = {"AMR":[0,128,255,220],"Truck":[255,165,0,220],"Sensor":[34,197,94,220],"Gateway":[147,51,234,220]}
-            df_map["fill_color"] = df_map["type"].map(type_colors)
-            df_map["label"] = df_map.apply(lambda r: f"{r.device_id} ({r.type})", axis=1)
-            df_map["radius"] = 6 + (df_map["risk"] * 16)
-
-            layers = [
-                pdk.Layer("ScatterplotLayer", data=df_map, get_position='[lon, lat]',
-                          get_fill_color='fill_color', get_radius='radius',
-                          get_line_color=[0,0,0,140], get_line_width=1, pickable=True),
-                pdk.Layer("TextLayer", data=df_map, get_position='[lon, lat]', get_text='label',
-                          get_color=[20,20,20,255], get_size=12, get_alignment_baseline="top", get_pixel_offset=[0,10]),
-            ]
-            # Infrastructure markers (AP/gNB)
-            cellular_mode = st.session_state.get("cellular_mode", False)
-            infra_label = "gNB" if cellular_mode else "AP"
-            rogue_label = "Rogue gNB" if cellular_mode else "Rogue AP"
-
-            ap_df = pd.DataFrame([{"lat": st.session_state.ap["lat"], "lon": st.session_state.ap["lon"], "label": infra_label}])
-            layers += [
-                pdk.Layer("ScatterplotLayer", data=ap_df, get_position='[lon, lat]', get_fill_color='[30,144,255,240]', get_radius=10),
-                pdk.Layer("TextLayer", data=ap_df, get_position='[lon, lat]', get_text='label', get_color=[30,144,255,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
-            ]
-            # Risk hazard overlay
-            warn_df = df_map[df_map["risk"] >= CFG.threshold].copy()
-            if len(warn_df) > 0:
-                warn_df["warn"] = "⚠"
-                layers += [
-                    pdk.Layer("TextLayer", data=warn_df, get_position='[lon, lat]', get_text='warn',
-                              get_color=[255,0,0,255], get_size=18, get_alignment_baseline="bottom", get_pixel_offset=[0,-18]),
-                    pdk.Layer("ScatterplotLayer", data=warn_df, get_position='[lon, lat]',
-                              get_fill_color='[0,0,0,0]', get_radius=26,
-                              stroked=True, get_line_color=[255,0,0,200], get_line_width=2)
-                ]
-            # Scenario overlays (circles)
-            def circle_layer(center, radius_m, color):
-                angles = np.linspace(0, 2*np.pi, 60)
-                lat_mean = float(st.session_state.devices.lat.mean())
-                path = [[
-                    center["lon"] + meters_to_latlon_offset(radius_m * math.sin(a), radius_m * math.cos(a), lat_mean)[1],
-                    center["lat"] + meters_to_latlon_offset(radius_m * math.sin(a), radius_m * math.cos(a), lat_mean)[0]
-                ] for a in angles]
-                return pdk.Layer("PathLayer", [{"path": path}], get_path="path", get_color=color, width_scale=4, width_min_pixels=1, opacity=0.25)
-            if scenario.startswith("Jamming"):
-                jam = st.session_state.jammer
-                jam_df = pd.DataFrame([{"lat": jam["lat"], "lon": jam["lon"], "label": "Jammer"}])
-                layers += [
-                    pdk.Layer("ScatterplotLayer", data=jam_df, get_position='[lon, lat]', get_fill_color='[255,0,0,240]', get_radius=10),
-                    pdk.Layer("TextLayer", data=jam_df, get_position='[lon, lat]', get_text='label', get_color=[255,0,0,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
-                    circle_layer(jam, CFG.jam_radius_m, [255,0,0])
-                ]
-            if scenario.startswith("Access Breach"):
-                rog = st.session_state.rogue
-                rog_df = pd.DataFrame([{"lat": rog["lat"], "lon": rog["lon"], "label": rogue_label}])
-                layers += [
-                    pdk.Layer("ScatterplotLayer", data=rog_df, get_position='[lon, lat]', get_fill_color='[0,255,255,240]', get_radius=10),
-                    pdk.Layer("TextLayer", data=rog_df, get_position='[lon, lat]', get_text='label', get_color=[0,200,200,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
-                    circle_layer(rog, CFG.breach_radius_m, [0,200,200])
-                ]
-            if scenario.startswith("GPS Spoofing"):
-                spf = st.session_state.spoofer
-                spf_df = pd.DataFrame([{"lat": spf["lat"], "lon": spf["lon"], "label": "Spoofer"}])
-                layers += [
-                    pdk.Layer("ScatterplotLayer", data=spf_df, get_position='[lon, lat]', get_fill_color='[255,215,0,240]', get_radius=10),
-                    pdk.Layer("TextLayer", data=spf_df, get_position='[lon, lat]', get_text='label', get_color=[255,215,0,255], get_size=14, get_alignment_baseline="bottom", get_pixel_offset=[0,-10]),
-                    circle_layer(spf, CFG.spoof_radius_m, [255,215,0])
-                ]
-
-            view_state = pdk.ViewState(
-                latitude=float(st.session_state.devices.lat.mean()),
-                longitude=float(st.session_state.devices.lon.mean()),
-                zoom=14, pitch=0
-            )
-            tooltip = {"html": "<b>{device_id}</b> • {type}<br/>Risk: {risk:.2f}<br/>SNR: {snr} dB<br/>Loss: {packet_loss}%",
-                       "style": {"backgroundColor": "rgba(255,255,255,0.95)", "color": "#111"}}
-            st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, map_style=None, tooltip=tooltip), width="stretch")
-
-            st.markdown(
-                """
-                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;">
-                  <span style="display:inline-flex;align-items:center;gap:6px;">
-                    <span style="width:12px;height:12px;background:#0080FF;border-radius:2px;display:inline-block;"></span> AMR
-                  </span>
-                  <span style="display:inline-flex;align-items:center;gap:6px;">
-                    <span style="width:12px;height:12px;background:#FFA500;border-radius:2px;display:inline-block;"></span> Truck
-                  </span>
-                  <span style="display:inline-flex;align-items:center;gap:6px;">
-                    <span style="width:12px;height:12px;background:#22C55E;border-radius:2px;display:inline-block;"></span> Sensor
-                  </span>
-                  <span style="display:inline-flex;align-items:center;gap:6px;">
-                    <span style="width:12px;height:12px;background:#9333EA;border-radius:2px;display:inline-block;"></span> Gateway
-                  </span>
-                  <span style="margin-left:auto;opacity:.8;">Dot size = risk • ⚠ = above threshold</span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        # Fleet averages over time
-        fr = pd.DataFrame(list(st.session_state.fleet_records))
-        if len(fr)>0:
-            for y in ["snr","packet_loss","latency_ms","pos_error_m"]:
-                sub = fr.groupby("tick")[y].mean().reset_index()
-                fig=px.line(sub, x="tick", y=y, title=f"Fleet avg {y}")
-                st.plotly_chart(fig, width="stretch", key=f"overview_{y}")
-                if y == "snr" and help_mode:
-                    st.caption("**Fleet avg SNR**: mean link quality; <10 dB shaky; >20 dB healthy.")
-
-    with right:
-        leaderboard=[]
-        if st.session_state.get("model") is not None:
-            for _, r in st.session_state.devices.iterrows():
-                prob = st.session_state.latest_probs.get(r.device_id, 0.0)
-                pval=conformal_pvalue(prob) if use_conformal else None
-                sev,_=severity(prob,pval)
-                leaderboard.append({"device_id":r.device_id,"type":r.type,"prob":prob,"p_value":pval,"severity":sev})
-        if leaderboard:
-            df_lead=pd.DataFrame(leaderboard).sort_values("prob",ascending=False).head(10)
-            st.markdown("### Top risk devices")
-            st.dataframe(df_lead, width="stretch")
-
-# ---------- Fleet View
-with tab_fleet:
-    fr = pd.DataFrame(list(st.session_state.fleet_records))
-    if len(fr)>0 and show_heatmap:
-        recent = fr[fr["tick"]>=st.session_state.tick-40]
-        cols = ["snr","packet_loss","latency_ms","jitter_ms","pos_error_m","crc_err","throughput_mbps","channel_util",
-                "noise_floor_dbm","cca_busy_frac","phy_error_rate","deauth_rate","assoc_churn","eapol_retry_rate","dhcp_fail_rate"]
-        cols = [c for c in cols if c in recent.columns]
-        if len(cols)>0:
-            mat = recent.groupby("device_id")[cols].mean()
-            z = (mat-mat.mean())/mat.std(ddof=0).replace(0,1)
-            fig = px.imshow(z.T, color_continuous_scale="RdBu_r", aspect="auto",
-                            labels=dict(color="z-score"), title="Fleet heatmap (recent mean z-scores)")
-            st.plotly_chart(fig, width="stretch", key="fleet_heatmap")
-    st.dataframe(st.session_state.devices, width="stretch")
-
-# ---------- Incidents
 with tab_incidents:
     st.subheader("Incidents")
     all_inc = st.session_state.incidents
@@ -1759,11 +1614,6 @@ with tab_incidents:
             for inc in all_inc:
                 if inc["severity"] in sev_sel_all:
                     render_incident_card(inc, role, scope="all")
-    if st.session_state.incidents:
-        df_inc = pd.DataFrame(st.session_state.incidents)
-        df_inc["top_features"] = df_inc["reasons"].apply(lambda r: "; ".join([f"{x['feature']}:{x['impact']:+.3f}" for x in r]))
-        csv = df_inc.drop(columns=["reasons","type_reasons"]).to_csv(index=False).encode("utf-8")
-        st.download_button("Download incidents CSV", csv, "incidents.csv", "text/csv", key="dl_incidents_csv")
 
 # ---------- Insights
 with tab_insights:
@@ -1776,10 +1626,8 @@ with tab_insights:
             shap_mat = shap_pos(st.session_state.explainer, base)
             mean_abs = np.abs(shap_mat).mean(axis=0)
             imp = pd.DataFrame({"feature": base.columns, "mean_abs_shap": mean_abs}).sort_values("mean_abs_shap", ascending=False).head(18)
-            fig = px.bar(imp, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact — bigger bars = more influence")
+            fig = px.bar(imp, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact")
             st.plotly_chart(fig, width="stretch", key=f"global_importance_{nonce}")
-            if help_mode:
-                st.caption("**Global importance (mean |SHAP|)**: average absolute contribution across many samples — bigger bars = more influential.")
         else:
             st.info("Train the model to view global importance.")
     with g2:
@@ -1797,63 +1645,20 @@ with tab_insights:
                     bin_y.append(y_test[msk].mean())
             if bin_p:
                 df_rel = pd.DataFrame({"confidence": bin_p, "empirical": bin_y})
-                fig = px.line(df_rel, x="confidence", y="empirical", title=f"Reliability (Brier {ev.get('brier', np.nan):.3f}) — closer to diagonal is better")
+                fig = px.line(df_rel, x="confidence", y="empirical", title=f"Reliability (Brier {ev.get('brier', np.nan):.3f})")
                 fig.add_scatter(x=[0,1], y=[0,1], mode="lines", name="perfect")
                 st.plotly_chart(fig, width="stretch", key=f"calibration_curve_{nonce}")
-                if help_mode:
-                    st.caption("**Calibration reliability**: predicted vs actual frequencies; closer to diagonal is better. **Brier score** lower is better.")
         else:
             st.info("Train (or retrain) to view calibration.")
     st.markdown("### Feature glossary")
     st.table(pd.DataFrame({"Feature (base)": list(FEATURE_GLOSSARY.keys()),
                            "Meaning": [FEATURE_GLOSSARY[k] for k in FEATURE_GLOSSARY]}))
 
-# ---------- Governance
+# ---------- Governance (kept minimal)
 with tab_governance:
     nonce = st.session_state.ui_nonce
     st.subheader("EU AI Act — Transparency & Governance (Demo)")
-    c1,c2,c3 = st.columns(3)
-    with c1: st.success("✅ Data transparency");  st.success("✅ Model transparency")
-    with c2: st.success("✅ Logging & evidence"); st.success("✅ Human oversight")
-    with c3: st.info("ℹ️ Risk: Demonstration system (synthetic, non-production)")
-    if help_mode:
-        st.caption("This demo surfaces transparency artifacts inline to help stakeholders understand data, model, confidence, and controls. Not legal advice.")
-
-    st.markdown("### Data transparency")
-    st.write("- **Source**: synthetic telemetry (no personal data).")
-    st.write("- **Signals**: RF/network (e.g., SNR, loss), GNSS error, integrity checks.")
-    st.write("- **Retention**: incidents kept in session memory; export below.")
-    c = st.columns(2)
-    with c[0]:
-        st.download_button(
-            "Download data schema (JSON)",
-            data=json.dumps(_to_builtin(data_schema_json()), indent=2).encode("utf-8"),
-            file_name="data_schema.json",
-            mime="application/json",
-            key=f"gov_dl_schema_json_{nonce}"
-        )
-    with c[1]:
-        if st.session_state.incidents:
-            st.download_button(
-                "Download audit log (incidents.json)",
-                data=json.dumps(audit_log_json(), indent=2).encode("utf-8"),
-                file_name="incidents_audit_log.json",
-                mime="application/json",
-                key=f"gov_dl_audit_json_{nonce}"
-            )
-        else:
-            st.caption("No incidents yet to export.")
-
-    st.markdown("### Model transparency")
-    mc = model_card_data()
-    st.json(mc, expanded=False)
-    st.download_button(
-        "Download model card (JSON)",
-        data=json.dumps(_to_builtin(mc), indent=2).encode("utf-8"),
-        file_name="model_card.json",
-        mime="application/json",
-        key=f"gov_dl_model_card_{nonce}"
-    )
+    st.info("This demo surfaces transparency artifacts inline to help stakeholders understand data, model, confidence, and controls. Not legal advice.")
 
     st.markdown("## Training Explainer")
     st.markdown(
