@@ -400,13 +400,13 @@ def _render_training_explainer(nonce: str):
     if bin_dist:
         df_bin = pd.DataFrame({"class": list(bin_dist.keys()), "count": list(bin_dist.values())})
         fig = px.bar(df_bin, x="class", y="count", title="Binary class balance (Normal vs Anomaly)")
-        st.plotly_chart(fig, use_container_width=True, key=f"train_bin_{nonce}")
+        st.plotly_chart(fig, width="stretch", key=f"train_bin_{nonce}")
     type_dist = ti.get("type_distribution", {})
     if type_dist:
         df_type = pd.DataFrame({"type": list(type_dist.keys()), "count": list(type_dist.values())})
         fig2 = px.bar(df_type.sort_values("count", ascending=False), x="count", y="type",
                       orientation="h", title="Attack-type balance (training positives)")
-        st.plotly_chart(fig2, use_container_width=True, key=f"train_type_{nonce}")
+        st.plotly_chart(fig2, width="stretch", key=f"train_type_{nonce}")
     met = st.session_state.get("metrics", {})
     if met:
         st.markdown(
@@ -419,7 +419,7 @@ def _render_training_explainer(nonce: str):
     if logs:
         st.markdown("#### Training console")
         df_logs = pd.DataFrame(logs)
-        st.dataframe(df_logs.tail(50), use_container_width=True)
+        st.dataframe(df_logs.tail(50), width="stretch")
 
 # =========================
 # Session init
@@ -1408,24 +1408,24 @@ def render_device_inspector_from_incident(inc, topk=8, scope="main"):
         gauge={'axis': {'range': [0,100]},
                'threshold': {'line': {'color': "red", 'width': 3}, 'thickness': 0.8, 'value': CFG.threshold*100}}
     ))
-    st.plotly_chart(gauge, use_container_width=True, key=f"gauge_{base_key}")
+    st.plotly_chart(gauge, width="stretch", key=f"gauge_{base_key}")
     shap_vec = shap_pos(st.session_state.explainer, Xs_df)[0]
     pairs = sorted(zip(cols, shap_vec), key=lambda kv: abs(kv[1]), reverse=True)[:topk]
     df_shap = pd.DataFrame(pairs, columns=["feature", "impact"])
     fig = px.bar(df_shap.sort_values("impact"), x="impact", y="feature", orientation="h",
                  title=f"Top local contributions — {inc['device_id']}",
                  labels={"impact": "contribution → anomaly"})
-    st.plotly_chart(fig, use_container_width=True, key=f"local_shap_{base_key}")
+    st.plotly_chart(fig, width="stretch", key=f"local_shap_{base_key}")
     hist = get_device_history(inc["device_id"], ["snr","packet_loss","latency_ms","pos_error_m"])
     if len(hist)>0:
         hist = hist.reset_index(drop=True)
         c1,c2 = st.columns(2)
-        c1.plotly_chart(px.line(hist, y="snr", title="SNR (last window)"), use_container_width=True, key=f"hist_snr_{base_key}")
-        c1.plotly_chart(px.line(hist, y="packet_loss", title="Packet loss % (last window)"), use_container_width=True, key=f"hist_loss_{base_key}")
-        c2.plotly_chart(px.line(hist, y="latency_ms", title="Latency ms (last window)"), use_container_width=True, key=f"hist_latency_{base_key}")
-        c2.plotly_chart(px.line(hist, y="pos_error_m", title="GNSS error m (last window)"), use_container_width=True, key=f"hist_gnss_{base_key}")
+        c1.plotly_chart(px.line(hist, y="snr", title="SNR (last window)"), width="stretch", key=f"hist_snr_{base_key}")
+        c1.plotly_chart(px.line(hist, y="packet_loss", title="Packet loss % (last window)"), width="stretch", key=f"hist_loss_{base_key}")
+        c2.plotly_chart(px.line(hist, y="latency_ms", title="Latency ms (last window)"), width="stretch", key=f"hist_latency_{base_key}")
+        c2.plotly_chart(px.line(hist, y="pos_error_m", title="GNSS error m (last window)"), width="stretch", key=f"hist_gnss_{base_key}")
     with st.expander("Raw window features (standardized input)"):
-        st.dataframe(Xs_df.T.rename(columns={0: "z-value"}), use_container_width=True)
+        st.dataframe(Xs_df.T.rename(columns={0: "z-value"}), width="stretch")
 
 # =========================
 # Role-aware incident rendering & categorization
@@ -1511,7 +1511,7 @@ def render_incident_body_for_role(inc, role, scope="main"):
                 X = X.reindex(columns=cols, fill_value=0.0)
                 Xs = st.session_state.scaler.transform(X)
                 Xs_df = pd.DataFrame(Xs, columns=cols)
-                st.dataframe(Xs_df.T.rename(columns={0:"z"}), use_container_width=True)
+                st.dataframe(Xs_df.T.rename(columns={0:"z"}), width="stretch")
 
     else:  # Executive
         st.markdown("**Executive summary**")
@@ -1581,7 +1581,8 @@ with tab_overview:
     left, right = st.columns([2,1])
 
     with left:
-        if show_map and st.session_state.get("model") is not None:
+        # Map is now shown as long as show_map is True (no model requirement)
+        if show_map:
             df_map = st.session_state.devices.copy()
             if type_filter and len(type_filter) < len(DEVICE_TYPES):
                 df_map = df_map[df_map["type"].isin(type_filter)].copy()
@@ -1671,7 +1672,7 @@ with tab_overview:
             )
             tooltip = {"html": "<b>{device_id}</b> • {type}<br/>Risk: {risk:.2f}<br/>SNR: {snr} dB<br/>Loss: {packet_loss}%",
                        "style": {"backgroundColor": "rgba(255,255,255,0.95)", "color": "#111"}}
-            st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, map_style=None, tooltip=tooltip), use_container_width=True)
+            st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, map_style=None, tooltip=tooltip), width="stretch")
 
             st.markdown(
                 """
@@ -1700,7 +1701,7 @@ with tab_overview:
             for y in ["snr","packet_loss","latency_ms","pos_error_m"]:
                 sub = fr.groupby("tick")[y].mean().reset_index()
                 fig=px.line(sub, x="tick", y=y, title=f"Fleet avg {y}")
-                st.plotly_chart(fig, use_container_width=True, key=f"overview_{y}")
+                st.plotly_chart(fig, width="stretch", key=f"overview_{y}")
                 if y == "snr" and help_mode:
                     st.caption("**Fleet avg SNR**: mean link quality; <10 dB shaky; >20 dB healthy.")
 
@@ -1715,7 +1716,7 @@ with tab_overview:
         if leaderboard:
             df_lead=pd.DataFrame(leaderboard).sort_values("prob",ascending=False).head(10)
             st.markdown("### Top risk devices")
-            st.dataframe(df_lead, use_container_width=True)
+            st.dataframe(df_lead, width="stretch")
 
 # ---------- Fleet View
 with tab_fleet:
@@ -1730,8 +1731,8 @@ with tab_fleet:
             z = (mat-mat.mean())/mat.std(ddof=0).replace(0,1)
             fig = px.imshow(z.T, color_continuous_scale="RdBu_r", aspect="auto",
                             labels=dict(color="z-score"), title="Fleet heatmap (recent mean z-scores)")
-            st.plotly_chart(fig, use_container_width=True, key="fleet_heatmap")
-    st.dataframe(st.session_state.devices, use_container_width=True)
+            st.plotly_chart(fig, width="stretch", key="fleet_heatmap")
+    st.dataframe(st.session_state.devices, width="stretch")
 
 # ---------- Incidents
 with tab_incidents:
@@ -1776,7 +1777,7 @@ with tab_insights:
             mean_abs = np.abs(shap_mat).mean(axis=0)
             imp = pd.DataFrame({"feature": base.columns, "mean_abs_shap": mean_abs}).sort_values("mean_abs_shap", ascending=False).head(18)
             fig = px.bar(imp, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact — bigger bars = more influence")
-            st.plotly_chart(fig, use_container_width=True, key=f"global_importance_{nonce}")
+            st.plotly_chart(fig, width="stretch", key=f"global_importance_{nonce}")
             if help_mode:
                 st.caption("**Global importance (mean |SHAP|)**: average absolute contribution across many samples — bigger bars = more influential.")
         else:
@@ -1798,7 +1799,7 @@ with tab_insights:
                 df_rel = pd.DataFrame({"confidence": bin_p, "empirical": bin_y})
                 fig = px.line(df_rel, x="confidence", y="empirical", title=f"Reliability (Brier {ev.get('brier', np.nan):.3f}) — closer to diagonal is better")
                 fig.add_scatter(x=[0,1], y=[0,1], mode="lines", name="perfect")
-                st.plotly_chart(fig, use_container_width=True, key=f"calibration_curve_{nonce}")
+                st.plotly_chart(fig, width="stretch", key=f"calibration_curve_{nonce}")
                 if help_mode:
                     st.caption("**Calibration reliability**: predicted vs actual frequencies; closer to diagonal is better. **Brier score** lower is better.")
         else:
