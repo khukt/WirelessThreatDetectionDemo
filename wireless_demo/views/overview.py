@@ -13,6 +13,121 @@ from ..helpers import conformal_pvalue, haversine_m, meters_to_latlon_offset, se
 from ..ux import render_focus_callout, render_scenario_context, render_section_card, render_tab_intro, style_plotly_figure
 
 
+TREND_LABELS = {
+    "snr": "Signal quality",
+    "packet_loss": "Packet loss",
+    "latency_ms": "Latency",
+    "pos_error_m": "Position error",
+}
+
+TREND_DIRECTIONS = {
+    "snr": {"higher_is_worse": False, "unit": "dB"},
+    "packet_loss": {"higher_is_worse": True, "unit": "%"},
+    "latency_ms": {"higher_is_worse": True, "unit": "ms"},
+    "pos_error_m": {"higher_is_worse": True, "unit": "m"},
+}
+
+
+def _scenario_watch_text(scenario):
+    if scenario.startswith("Jamming"):
+        return "Watch for falling signal quality and rising packet loss near the interference radius."
+    if scenario.startswith("Access Breach"):
+        return "Watch for access-layer disruption near the rogue infrastructure and queue movement toward nearby devices."
+    if scenario.startswith("GPS Spoofing"):
+        return "Watch for localized position error and navigation drift, especially on mobile assets in the spoofed area."
+    if scenario.startswith("Data Tamper"):
+        return "Watch for gateway-led anomalies and downstream integrity issues before they spread into the wider queue."
+    return "Watch for any device or area that breaks from baseline and starts climbing the queue."
+
+
+def _scenario_overlay_label(scenario):
+    if scenario.startswith("Jamming"):
+        return "Interference radius"
+    if scenario.startswith("Access Breach"):
+        return "Rogue infrastructure zone"
+    if scenario.startswith("GPS Spoofing"):
+        return "Spoofing radius"
+    if scenario.startswith("Data Tamper"):
+        return "Gateway integrity focus"
+    return "Baseline view"
+
+
+def _overview_snapshot(df_map):
+    if df_map is None or df_map.empty:
+        return {
+            "visible_devices": 0,
+            "avg_risk": 0.0,
+            "above_threshold": 0,
+            "top_device": "—",
+            "top_risk": 0.0,
+        }
+
+    top_row = df_map.sort_values(["risk", "device_id"], ascending=[False, True]).iloc[0]
+    return {
+        "visible_devices": len(df_map),
+        "avg_risk": float(df_map["risk"].mean()),
+        "above_threshold": int((df_map["risk"] >= CFG.threshold).sum()),
+        "top_device": str(top_row["device_id"]),
+        "top_risk": float(top_row["risk"]),
+    }
+
+
+def _queue_dataframe(leaderboard, use_conformal):
+    queue_df = pd.DataFrame(leaderboard).sort_values(["queue_score", "prob"], ascending=False).head(8).copy()
+    queue_df = queue_df.rename(
+        columns={
+            "device_id": "Device",
+            "type": "Type",
+            "prob": "Live risk",
+            "p_value": "Conformal p-value",
+            "severity": "Severity",
+            "review_status": "Review",
+            "queue_score": "Queue score",
+        }
+    )
+    formatters = {
+        "Live risk": "{:.2f}",
+        "Queue score": "{:.2f}",
+    }
+    if use_conformal:
+        formatters["Conformal p-value"] = lambda value: "—" if value is None else f"{value:.2f}"
+    else:
+        queue_df = queue_df.drop(columns=["Conformal p-value"])
+    return queue_df, formatters
+
+
+def _trend_window_summary(fleet_trends, metric):
+    if fleet_trends is None or fleet_trends.empty or metric not in fleet_trends.columns:
+        return None
+
+    window_size = max(8, min(20, len(fleet_trends) // 3 if len(fleet_trends) >= 12 else len(fleet_trends)))
+    baseline = fleet_trends.head(window_size)
+    recent = fleet_trends.tail(window_size)
+    if baseline.empty or recent.empty:
+        return None
+
+    baseline_mean = float(baseline[metric].mean())
+    recent_mean = float(recent[metric].mean())
+    delta = recent_mean - baseline_mean
+    trend_meta = TREND_DIRECTIONS.get(metric, {"higher_is_worse": True, "unit": ""})
+    higher_is_worse = trend_meta["higher_is_worse"]
+    if abs(delta) < 1e-9:
+        status = "Flat"
+    elif (delta > 0 and higher_is_worse) or (delta < 0 and not higher_is_worse):
+        status = "Worsening"
+    else:
+        status = "Improving"
+
+    return {
+        "baseline_mean": baseline_mean,
+        "recent_mean": recent_mean,
+        "delta": delta,
+        "status": status,
+        "unit": trend_meta["unit"],
+        "window_size": window_size,
+    }
+
+
 @lru_cache(maxsize=64)
 def _cached_circle_path(lat, lon, radius_m, lat_ref, points=72):
     path = []
@@ -139,6 +254,15 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
             snapshot_cols[1].metric("Devices above threshold", active_alerts)
             snapshot_cols[2].metric("Elevated-risk devices", elevated_risk)
             snapshot_cols[3].metric("Top live risk", f"{top_device} · {top_prob:.2f}" if latest_probs else "Waiting for telemetry")
+            st.markdown(
+                "<div class='quick-chip-row'>"
+                f"<span class='quick-chip'>Scenario: {scenario}</span>"
+                f"<span class='quick-chip'>Threshold: {CFG.threshold:.2f}</span>"
+                f"<span class='quick-chip'>Conformal: {'On' if use_conformal else 'Off'}</span>"
+                f"<span class='quick-chip'>Type filter: {len(type_filter) if type_filter else len(DEVICE_TYPES)} selected</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
             if current_tick < CFG.rolling_len:
                 st.caption(f"Warm-up in progress: the detector needs about {CFG.rolling_len} ticks before incidents appear.")
             elif incident_count > 0:
@@ -146,10 +270,22 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
 
     def _render_overview_left_content():
         df_map = _build_overview_map_df(type_filter)
+        snapshot = _overview_snapshot(df_map)
+        spotlight = _scenario_spotlight(df_map, scenario)
 
         with st.container(border=True):
             st.caption("Geospatial view")
             st.markdown("#### Fleet map and scenario overlays")
+            st.markdown(
+                "<div class='quick-chip-row'>"
+                f"<span class='quick-chip'>Devices in view: {snapshot['visible_devices']}</span>"
+                f"<span class='quick-chip'>Avg visible risk: {snapshot['avg_risk']:.2f}</span>"
+                f"<span class='quick-chip'>Above threshold: {snapshot['above_threshold']}</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        render_focus_callout("What to watch", _scenario_watch_text(scenario), variant="info")
 
         if not show_map:
             render_focus_callout("Map hidden", "Enable the geospatial map in the sidebar to see devices and scenario overlays.")
@@ -170,6 +306,9 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
             df_map["fill_color"] = df_map["type"].map(type_colors)
             df_map["label"] = df_map.apply(lambda row: f"{row.device_id} ({row.type})", axis=1)
             df_map["radius"] = 6 + (df_map["risk"] * 16)
+            label_df = df_map[df_map["risk"] >= CFG.threshold].copy().sort_values(["risk", "device_id"], ascending=[False, True]).head(6)
+            if label_df.empty and not df_map.empty:
+                label_df = df_map.sort_values(["risk", "device_id"], ascending=[False, True]).head(3).copy()
 
             layers = [
                 pdk.Layer(
@@ -184,7 +323,7 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                 ),
                 pdk.Layer(
                     "TextLayer",
-                    data=df_map,
+                    data=label_df,
                     get_position="[lon, lat]",
                     get_text="label",
                     get_color=[20, 20, 20, 255],
@@ -309,38 +448,110 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                     "style": {"backgroundColor": "rgba(255,255,255,0.95)", "color": "#111"},
                 },
             )
-            st.pydeck_chart(deck, use_container_width=True)
-            with st.expander("Map legend", expanded=False):
+            map_cols = st.columns([1.45, 0.85])
+            with map_cols[0]:
+                st.pydeck_chart(deck, use_container_width=True)
                 st.markdown(
-                    "- **Blue / Orange / Green / Purple dots**: AMRs, Trucks, Sensors, Gateways  \n"
-                    "- **Red ring marker**: device currently above incident threshold  \n"
-                    "- **Larger marker radius**: higher live anomaly probability  \n"
-                    "- **Colored radius overlays**: active scenario coverage zone"
+                    "<div class='quick-chip-row'>"
+                    "<span class='quick-chip'>Blue/Orange/Green/Purple = device type</span>"
+                    "<span class='quick-chip'>Red ring = above threshold</span>"
+                    "<span class='quick-chip'>Bigger marker = higher live risk</span>"
+                    f"<span class='quick-chip'>{_scenario_overlay_label(scenario)}</span>"
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
+                st.caption("Only priority devices are labeled to keep the live map readable during demos.")
+            with map_cols[1]:
+                with st.container(border=True):
+                    st.markdown("#### Map readout")
+                    readout_cols = st.columns(2)
+                    readout_cols[0].metric("Visible devices", snapshot["visible_devices"])
+                    readout_cols[1].metric("Avg risk", f"{snapshot['avg_risk']:.2f}" if snapshot["visible_devices"] else "—")
+                    readout_cols = st.columns(2)
+                    readout_cols[0].metric("Above threshold", snapshot["above_threshold"])
+                    readout_cols[1].metric(
+                        "Top device",
+                        f"{snapshot['top_device']} · {snapshot['top_risk']:.2f}" if snapshot["visible_devices"] else "Waiting",
+                    )
+                    st.caption("Use this side panel to read the map quickly without hovering over every device.")
+                    st.markdown(
+                        "<div class='quick-chip-row'>"
+                        f"<span class='quick-chip'>Types: {', '.join(type_filter) if type_filter else 'All'}</span>"
+                        f"<span class='quick-chip'>Overlay: {scenario}</span>"
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+                with st.container(border=True):
+                    st.markdown("#### Overlay focus")
+                    st.caption(_scenario_overlay_label(scenario))
+                    if spotlight:
+                        st.markdown(
+                            "<div class='quick-chip-row'>"
+                            + "".join(spotlight.get("devices", [])[:3])
+                            + "</div>",
+                            unsafe_allow_html=True,
+                        )
+                        st.caption(spotlight["message"])
+                    else:
+                        st.caption("No concentrated hotspot is visible yet. Use the map and queue together as the scenario develops.")
         else:
             render_focus_callout("Model setup needed", "Run model setup to unlock the live map, risk overlays, and trend charts.", variant="warning")
 
         fleet_records = pd.DataFrame(list(st.session_state.fleet_records))
         render_section_card(
             "Fleet trends",
-            "These charts show how average fleet telemetry changes over time, helping connect local incidents to broader system behavior.",
+            "These charts compare the recent window with the session baseline so it is easier to explain what changed, not just what is currently high or low.",
             kicker="Trend view",
         )
         if len(fleet_records) > 0:
             trend_cols = ["snr", "packet_loss", "latency_ms", "pos_error_m"]
             fleet_trends = fleet_records.groupby("tick")[trend_cols].mean().reset_index()
+            trend_summaries = {
+                metric: _trend_window_summary(fleet_trends, metric)
+                for metric in trend_cols
+            }
+            summary_chips = []
+            for metric in trend_cols:
+                summary = trend_summaries.get(metric)
+                if not summary:
+                    continue
+                direction = "up" if summary["delta"] > 0 else ("down" if summary["delta"] < 0 else "flat")
+                summary_chips.append(
+                    f"<span class='quick-chip'>{TREND_LABELS.get(metric, metric)}: {summary['status']} ({direction})</span>"
+                )
+            if summary_chips:
+                st.markdown("<div class='quick-chip-row'>" + "".join(summary_chips) + "</div>", unsafe_allow_html=True)
+                st.caption("Baseline uses the early part of the session; recent uses the latest window of fleet telemetry.")
             chart_cols = st.columns(2)
             for idx, y_axis in enumerate(["snr", "packet_loss", "latency_ms", "pos_error_m"]):
-                title = f"Fleet average {y_axis.replace('_', ' ')}"
+                title = TREND_LABELS.get(y_axis, y_axis.replace("_", " ").title())
                 fig = px.line(fleet_trends, x="tick", y=y_axis, title=title)
+                summary = trend_summaries.get(y_axis)
+                if summary:
+                    fig.add_hline(
+                        y=summary["baseline_mean"],
+                        line_dash="dash",
+                        line_color="rgba(71,85,105,0.55)",
+                        annotation_text="baseline",
+                        annotation_position="top left",
+                    )
                 with chart_cols[idx % 2]:
                     with st.container(border=True):
+                        if summary:
+                            metric_cols = st.columns(3)
+                            metric_cols[0].metric("Recent", f"{summary['recent_mean']:.2f}{summary['unit']}")
+                            metric_cols[1].metric("Baseline", f"{summary['baseline_mean']:.2f}{summary['unit']}")
+                            metric_cols[2].metric("Direction", summary["status"], delta=f"{summary['delta']:+.2f}{summary['unit']}")
                         st.plotly_chart(
                             style_plotly_figure(fig, title=title, height=280),
                             use_container_width=True,
                             config={"displayModeBar": False},
                             key=f"overview_{y_axis}",
                         )
+                        if summary:
+                            st.caption(
+                                f"Recent {title.lower()} is {summary['status'].lower()} versus the session baseline over the last {summary['window_size']} ticks."
+                            )
         else:
             st.caption("Telemetry charts will populate once the stream starts collecting fleet samples.")
 
@@ -348,6 +559,8 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
         df_map = _build_overview_map_df(type_filter)
         latest_probs = st.session_state.get("latest_probs", {})
         active_alerts = sum(prob >= CFG.threshold for prob in latest_probs.values())
+        escalated_count = 0
+        suppressed_count = 0
 
         spotlight = _scenario_spotlight(df_map, scenario)
         if spotlight:
@@ -364,27 +577,17 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                     st.markdown("".join(spotlight_devices), unsafe_allow_html=True)
 
         render_section_card(
-            "Queue controls",
-            "This column shows how human oversight and queue ranking affect inspection order.",
+            "Response queue",
+            "Use this column to see what needs review first, how confidence checks affect the queue, and where human review remains in control.",
             kicker="Response focus",
         )
+        render_focus_callout(
+            "How queue ranking works",
+            "Higher live risk moves a device up the queue. Escalations add priority, and conformal p-values act as confidence checks that show whether the alert looks typical or uncertain.",
+            variant="info",
+        )
         policy = current_hitl_policy()
-        with st.container(border=True):
-            st.caption(
-                f"HITL policy: suppression {'on' if policy['suppression_enabled'] else 'off'} · "
-                f"window {policy['suppression_ticks']} ticks · escalation boost {policy['escalation_boost']:.2f}"
-            )
-            hitl_stats = st.session_state.get("hitl_live_stats", {})
-            if hitl_stats.get("suppressed_alerts") or hitl_stats.get("prioritized_alerts"):
-                st.markdown("#### Human oversight effect")
-                info_cols = st.columns(2)
-                info_cols[0].metric("Suppressed repeats", hitl_stats.get("suppressed_alerts", 0))
-                info_cols[1].metric("Prioritized alerts", hitl_stats.get("prioritized_alerts", 0))
-                last_effect = hitl_stats.get("last_effect")
-                if last_effect:
-                    st.caption(
-                        f"Latest HITL action: {last_effect['effect']} {last_effect['device_id']} at tick {last_effect['tick']} · {last_effect.get('reason') or 'No reason recorded.'}"
-                    )
+        hitl_stats = st.session_state.get("hitl_live_stats", {})
 
         leaderboard = []
         if st.session_state.get("model") is not None:
@@ -394,6 +597,10 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                 severity_label, _ = severity(prob, p_value)
                 latest_review = latest_review_for_device(row.device_id, scenario)
                 review_status = latest_review.get("status") if latest_review else "Pending Review"
+                if review_status == "Escalated":
+                    escalated_count += 1
+                if review_status == "False Positive":
+                    suppressed_count += 1
                 queue_score = prob + (policy["escalation_boost"] if review_status == "Escalated" else 0.0)
                 leaderboard.append(
                     {
@@ -406,11 +613,38 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                         "queue_score": queue_score,
                     }
                 )
+        with st.container(border=True):
+            summary_cols = st.columns(3)
+            summary_cols[0].metric("Devices to review", active_alerts)
+            summary_cols[1].metric("Escalated", escalated_count)
+            summary_cols[2].metric("Suppressed history", suppressed_count)
+            st.markdown(
+                "<div class='quick-chip-row'>"
+                f"<span class='quick-chip'>Suppression: {'On' if policy['suppression_enabled'] else 'Off'}</span>"
+                f"<span class='quick-chip'>Window: {policy['suppression_ticks']} ticks</span>"
+                f"<span class='quick-chip'>Escalation boost: {policy['escalation_boost']:.2f}</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            last_effect = hitl_stats.get("last_effect")
+            if last_effect:
+                st.caption(
+                    f"Latest reviewer effect: {last_effect['effect']} on {last_effect['device_id']} at tick {last_effect['tick']}."
+                )
+            elif hitl_stats.get("suppressed_alerts") or hitl_stats.get("prioritized_alerts"):
+                st.caption("Human review actions are influencing queue order in this session.")
         if leaderboard:
             with st.container(border=True):
                 st.markdown("#### Triage queue")
-                st.caption("Escalated devices move to the top; recent false positives can be suppressed.")
-                st.dataframe(pd.DataFrame(leaderboard).sort_values(["queue_score", "prob"], ascending=False).head(10), width="stretch")
+                st.caption("The first rows are the best candidates for human review right now.")
+                top_devices = [
+                    f"<span class='quick-chip'>{row['device_id']} · {row['severity']} · {row['prob']:.2f}</span>"
+                    for row in sorted(leaderboard, key=lambda item: (item["queue_score"], item["prob"]), reverse=True)[:4]
+                ]
+                if top_devices:
+                    st.markdown("<div class='quick-chip-row'>" + "".join(top_devices) + "</div>", unsafe_allow_html=True)
+                queue_df, formatters = _queue_dataframe(leaderboard, use_conformal)
+                st.dataframe(queue_df.style.format(formatters), width="stretch", hide_index=True)
         else:
             render_focus_callout("No queue yet", "Start playback or run model setup to generate live risk rankings.")
 

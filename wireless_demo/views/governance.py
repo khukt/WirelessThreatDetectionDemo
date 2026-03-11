@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from textwrap import dedent
 
 from ..hitl import current_hitl_policy, incident_review_key, review_rows
 from ..training import render_training_explainer
@@ -29,7 +30,7 @@ ROLE_GOVERNANCE_SUMMARY = {
     "Executive": {
         "title": "Leadership summary",
         "bullets": [
-            "Human review is built into incident decisions.",
+            "Human review remains in control of incident decisions.",
             "Audit and transparency evidence are visible in the app.",
             "The largest remaining gaps are fairness, impact assessment, and formal accountability.",
         ],
@@ -38,7 +39,7 @@ ROLE_GOVERNANCE_SUMMARY = {
         "title": "Assurance summary",
         "bullets": [
             "Human review, audit logging, and escalation are visible in the workflow.",
-            "Model logic, confidence controls, and review history are exposed inline.",
+            "Model logic, confidence checks, and review history are exposed inline.",
             "Formal governance, fairness measurement, and impact assessment are still incomplete.",
         ],
     },
@@ -171,7 +172,8 @@ TRUSTWORTHY_AI_PILLARS = [
 def _render_pillar_card(pillar):
     style = PILLAR_STATUS_STYLE.get(pillar["status"], PILLAR_STATUS_STYLE["Gap"])
     st.markdown(
-        f"""
+        dedent(
+            f"""
         <div class="pillar-card">
             <div class="pillar-title">{pillar['title']}</div>
             <div class="pillar-status" style="{style}">{pillar['status']}</div>
@@ -179,6 +181,7 @@ def _render_pillar_card(pillar):
             <div class="pillar-copy"><strong>Current gap:</strong> {pillar['gap']}</div>
         </div>
         """,
+        ),
         unsafe_allow_html=True,
     )
     with st.expander(f"Roadmap for {pillar['title']}", expanded=False):
@@ -199,10 +202,9 @@ def _render_governance_scorecard(strong_count, partial_count, gap_count, reviews
     roadmap_pressure = "High" if gap_count >= 2 else ("Moderate" if gap_count == 1 else "Low")
 
     st.markdown(
-        """
+        dedent(
+            f"""
         <div class="governance-scorecard-grid">
-        """
-        f"""
             <div class="governance-scorecard governance-scorecard--primary">
                 <div class="governance-scorecard-kicker">Readiness</div>
                 <div class="governance-scorecard-value">{readiness_score}%</div>
@@ -225,6 +227,7 @@ def _render_governance_scorecard(strong_count, partial_count, gap_count, reviews
             </div>
         </div>
         """,
+        ),
         unsafe_allow_html=True,
     )
 
@@ -232,7 +235,8 @@ def _render_governance_scorecard(strong_count, partial_count, gap_count, reviews
 def _render_pillar_group_header(status, count):
     meta = PILLAR_GROUP_META[status]
     st.markdown(
-        f"""
+        dedent(
+            f"""
         <div class="governance-group-header">
             <div>
                 <div class="governance-group-kicker">Pillar group</div>
@@ -245,6 +249,7 @@ def _render_pillar_group_header(status, count):
             </div>
         </div>
         """,
+        ),
         unsafe_allow_html=True,
     )
 
@@ -256,7 +261,7 @@ def _render_governance_snapshot(role, reviews, status_counts):
 
     render_section_card(
         "Governance readiness snapshot",
-        "Start here for the trust story: what is visible now, what still relies on human review, and where the biggest gaps remain.",
+        "Start here for the trust story: what assurance evidence is visible now, where human review remains in control, and where the biggest gaps remain.",
         kicker="Snapshot",
     )
 
@@ -275,9 +280,9 @@ def _render_governance_snapshot(role, reviews, status_counts):
         render_summary_list(
             "What is visible right now",
             [
-                "Human review is present in the incident workflow.",
+                "Human review remains in control of the incident workflow.",
                 "Audit evidence is downloadable with role, time, and notes.",
-                "The largest gaps are fairness, impact assessment, and formal accountability.",
+                "Confidence checks and model logic are visible alongside governance evidence.",
             ],
             kicker="Assurance summary",
         )
@@ -327,7 +332,7 @@ def _render_live_oversight_section(reviews, status_counts):
 
     render_section_card(
         "Live oversight status",
-        "This section shows the active HITL policy, current review mix, and the latest queue intervention.",
+        "This section shows the active HITL policy, current review mix, and the latest human intervention affecting queue order.",
         kicker="Operations snapshot",
     )
 
@@ -411,7 +416,7 @@ def render_governance_tab(role):
     render_tab_intro("Governance", role)
     render_section_card(
         "EU AI Act — Transparency & Governance",
-        "This page shows the trust controls, human oversight, and governance gaps visible in the demo, with the key assurance evidence first.",
+        "This page shows the trust controls, confidence checks, human review evidence, and governance gaps visible in the demo, with the key assurance evidence first.",
         kicker="Trust overview",
     )
 

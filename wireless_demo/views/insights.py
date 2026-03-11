@@ -49,6 +49,32 @@ def _render_role_summary(role):
     render_summary_list(summary["title"], summary["bullets"], kicker="Audience summary")
 
 
+def _render_insights_takeaway(role):
+    metrics = st.session_state.get("metrics") or {}
+    threshold = st.session_state.get("suggested_threshold") or st.session_state.get("th_slider")
+    type_model_ready = st.session_state.get("type_clf") is not None
+    review_count = len(st.session_state.get("reviews", []))
+
+    with st.container(border=True):
+        st.markdown("#### What matters most")
+        metric_cols = st.columns(3)
+        metric_cols[0].metric("Detector quality", _fmt_metric_value(metrics.get("auc"), precision=2))
+        metric_cols[1].metric("Alert threshold", _fmt_metric_value(threshold, precision=2))
+        metric_cols[2].metric("Threat typing", "Ready" if type_model_ready else "Rules fallback")
+        st.markdown(
+            "<div class='quick-chip-row'>"
+            f"<span class='quick-chip'>Conformal checks: {'On' if st.session_state.get('conformal_scores') is not None else 'Off'}</span>"
+            f"<span class='quick-chip'>Review records: {review_count}</span>"
+            f"<span class='quick-chip'>Outcome: human review stays in control</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if role in {"Executive", "Regulator"}:
+            st.caption("The key message: the model scores risk, checks confidence, suggests a likely threat, and leaves the final decision to human reviewers.")
+        else:
+            st.caption("Use this top summary to confirm model quality, confidence control, and whether the threat-typing path is active before opening the deeper diagnostics.")
+
+
 def _render_conformal_explainer():
     render_focus_callout(
         "What a conformal p-value means",
@@ -61,6 +87,269 @@ def _render_shap_explainer():
         "What SHAP means",
         "SHAP shows which inputs pushed a prediction up or down. Larger values mean a feature had more influence on the model's decision for that device or across the dataset.",
     )
+
+
+def _safe_lgbm_param(model, key, default="—"):
+    if model is None:
+        return default
+    try:
+        params = model.get_params()
+    except Exception:
+        return default
+    value = params.get(key, default)
+    if value is None:
+        return default
+    return value
+
+
+def _summarize_lgbm_model(model, label, fallback_objective):
+    if model is None:
+        return None
+
+    booster = getattr(model, "booster_", None)
+    params = model.get_params()
+    feature_names = []
+    if booster is not None:
+        try:
+            feature_names = list(booster.feature_name())
+        except Exception:
+            feature_names = []
+    tree_count = getattr(booster, "num_trees", lambda: params.get("n_estimators", "—"))()
+    feature_count = getattr(booster, "num_feature", lambda: "—")()
+    current_iteration = getattr(booster, "current_iteration", lambda: params.get("n_estimators", "—"))()
+    objective = params.get("objective") or fallback_objective
+    num_class = params.get("num_class", 1)
+    model_family = "Multiclass classifier" if str(objective) == "multiclass" else "Binary classifier"
+
+    return {
+        "label": label,
+        "family": model_family,
+        "objective": objective,
+        "boosting_type": params.get("boosting_type", "gbdt"),
+        "trees": tree_count,
+        "trained_iterations": current_iteration,
+        "max_depth": params.get("max_depth", "—"),
+        "num_leaves": params.get("num_leaves", 31),
+        "learning_rate": params.get("learning_rate", "—"),
+        "min_child_samples": params.get("min_child_samples", "—"),
+        "subsample": params.get("subsample", "—"),
+        "colsample_bytree": params.get("colsample_bytree", "—"),
+        "feature_count": feature_count,
+        "feature_name_count": len(feature_names) if feature_names else feature_count,
+        "feature_preview": ", ".join(feature_names[:4]) if feature_names else "—",
+        "num_class": num_class,
+        "why_this_model": (
+            "Uses shallow boosted trees to score tabular telemetry quickly, handle mixed feature scales, and stay easier to inspect than a neural network."
+            if str(objective) != "multiclass"
+            else "Uses boosted trees for multiclass attack typing so the app can separate Jamming, Breach, Spoof, and Tamper with a compact, inspectable model."
+        ),
+    }
+
+
+def _model_architecture_comparison_figure(model_cards):
+    metric_rows = []
+    metric_specs = [
+        ("trees", "Trees"),
+        ("max_depth", "Max depth"),
+        ("num_leaves", "Leaves / tree"),
+        ("feature_name_count", "Feature count"),
+    ]
+
+    for metric_key, metric_label in metric_specs:
+        for model_card in model_cards:
+            try:
+                value = float(model_card[metric_key])
+            except Exception:
+                continue
+            metric_rows.append(
+                {
+                    "metric": metric_label,
+                    "model": model_card["label"],
+                    "value": value,
+                }
+            )
+
+    if not metric_rows:
+        return None
+
+    comparison_df = pd.DataFrame(metric_rows)
+    fig = px.bar(
+        comparison_df,
+        x="metric",
+        y="value",
+        color="model",
+        barmode="group",
+        title="LightGBM architecture comparison",
+        color_discrete_sequence=["#2563eb", "#7c3aed"],
+    )
+    fig.update_traces(texttemplate="%{y:.0f}", textposition="outside")
+    fig.update_yaxes(title="Value")
+    return style_plotly_figure(fig, height=320, show_legend=True)
+
+
+def _feature_importance_figure(importance_df, title, height):
+    ranked = importance_df.copy().sort_values("mean_abs_shap", ascending=True).reset_index(drop=True)
+    ranked["rank_band"] = ["Top drivers" if idx >= len(ranked) - 3 else "Other drivers" for idx in range(len(ranked))]
+    fig = px.bar(
+        ranked,
+        x="mean_abs_shap",
+        y="feature",
+        orientation="h",
+        color="rank_band",
+        title=title,
+        color_discrete_map={"Top drivers": "#2563eb", "Other drivers": "#cbd5e1"},
+    )
+    fig.update_traces(texttemplate="%{x:.3f}", textposition="outside")
+    fig.update_layout(showlegend=False)
+    fig.update_xaxes(title="Mean |SHAP| impact")
+    fig.update_yaxes(title="")
+    return style_plotly_figure(fig, height=height)
+
+
+def _calibration_figure(reliability, brier_value):
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=reliability["confidence"],
+            y=reliability["empirical"],
+            mode="lines+markers",
+            name="Observed frequency",
+            line=dict(color="#2563eb", width=3),
+            marker=dict(size=8, color="#2563eb"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            name="Perfect calibration",
+            line=dict(color="#94a3b8", width=2, dash="dash"),
+        )
+    )
+    fig.update_layout(title=f"Reliability curve (Brier {brier_value:.3f})")
+    fig.update_xaxes(title="Model confidence", range=[0, 1])
+    fig.update_yaxes(title="Observed anomaly rate", range=[0, 1])
+    return style_plotly_figure(fig, height=420, show_legend=True)
+
+
+def _render_training_footprint_panel(training_info):
+    if not training_info:
+        return
+
+    binary_dist = training_info.get("binary_distribution", {}) or {}
+    type_dist = training_info.get("type_distribution", {}) or {}
+    anomaly_count = int(binary_dist.get("Anomaly", 0))
+    normal_count = int(binary_dist.get("Normal", 0))
+    observed_types = ", ".join(sorted(type_dist.keys())) if type_dist else "None yet"
+    profile_mix = ", ".join(
+        f"{key}: {value}" for key, value in (training_info.get("profile_distribution", {}) or {}).items()
+    ) or "—"
+    scale_pos_weight = training_info.get("scale_pos_weight")
+
+    st.markdown("#### Training data footprint")
+    st.caption("This shows the size and class balance of the synthetic dataset used to fit the current models.")
+    st.markdown(
+        dedent(
+            f"""
+        <div class="governance-scorecard-grid">
+            <div class="governance-scorecard governance-scorecard--primary">
+                <div class="governance-scorecard-kicker">Training windows</div>
+                <div class="governance-scorecard-value">{training_info.get('n_windows', 0)}</div>
+                <div class="governance-scorecard-copy">Rolling telemetry windows used to fit and evaluate the current models.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Devices</div>
+                <div class="governance-scorecard-value">{training_info.get('n_devices', 0)}</div>
+                <div class="governance-scorecard-copy">Synthetic fleet assets represented during training data generation.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Feature width</div>
+                <div class="governance-scorecard-value">{training_info.get('n_features', 0)}</div>
+                <div class="governance-scorecard-copy">Engineered rolling-window features available to the anomaly detector.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Class reweighting</div>
+                <div class="governance-scorecard-value">{f'{scale_pos_weight:.2f}' if scale_pos_weight is not None else '—'}</div>
+                <div class="governance-scorecard-copy">`scale_pos_weight` helps balance anomaly rarity during binary training.</div>
+            </div>
+        </div>
+        """
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='quick-chip-row'>"
+        f"<span class='quick-chip'>Normal windows: {normal_count}</span>"
+        f"<span class='quick-chip'>Anomaly windows: {anomaly_count}</span>"
+        f"<span class='quick-chip'>Observed attack classes: {observed_types}</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    render_focus_callout(
+        "What `scale_pos_weight` means",
+        "It tells LightGBM to treat rare anomaly windows as more important during training. A higher value means the model puts more emphasis on catching anomalies instead of defaulting too often to the much more common normal class.",
+        variant="info",
+    )
+    st.caption(f"Profile mix: {profile_mix}")
+
+
+def _render_model_architecture_panel():
+    detector = _summarize_lgbm_model(st.session_state.get("model"), "Anomaly detector", "binary")
+    type_model = _summarize_lgbm_model(st.session_state.get("type_clf"), "Attack type model", "multiclass")
+    training_info = st.session_state.get("training_info", {}) or {}
+
+    render_focus_callout(
+        "What kind of model this is",
+        "These are LightGBM gradient-boosted decision tree models, not neural networks. That means there are no neurons or hidden layers to report. The main architecture knobs are tree count, tree depth, leaf count, learning rate, and feature sampling.",
+        variant="info",
+    )
+
+    model_cards = [card for card in [detector, type_model] if card is not None]
+    if not model_cards:
+        render_focus_callout("Model setup needed", "Run model setup to inspect the trained LightGBM model configuration.", variant="warning")
+        return
+
+    cols = st.columns(len(model_cards))
+    for idx, model_card in enumerate(model_cards):
+        with cols[idx]:
+            with st.container(border=True):
+                st.markdown(f"#### {model_card['label']}")
+                st.caption(f"{model_card['family']} · objective `{model_card['objective']}` · booster `{model_card['boosting_type']}`")
+                metric_cols = st.columns(3)
+                metric_cols[0].metric("Trees", model_card["trees"])
+                metric_cols[1].metric("Max depth", model_card["max_depth"])
+                metric_cols[2].metric("Leaves/tree", model_card["num_leaves"])
+
+                details_df = pd.DataFrame(
+                    [
+                        {"Setting": "Learning rate", "Value": model_card["learning_rate"]},
+                        {"Setting": "Min child samples", "Value": model_card["min_child_samples"]},
+                        {"Setting": "Row subsample", "Value": model_card["subsample"]},
+                        {"Setting": "Column subsample", "Value": model_card["colsample_bytree"]},
+                        {"Setting": "Feature count", "Value": model_card["feature_name_count"]},
+                        {"Setting": "Feature preview", "Value": model_card["feature_preview"]},
+                        {"Setting": "Training iterations", "Value": model_card["trained_iterations"]},
+                        {"Setting": "Classes", "Value": model_card["num_class"] if model_card["num_class"] != 1 else "Binary"},
+                    ]
+                )
+                details_df["Value"] = details_df["Value"].astype(str)
+                st.table(details_df)
+                st.caption(model_card["why_this_model"])
+
+    comparison_fig = _model_architecture_comparison_figure(model_cards)
+    if comparison_fig is not None and len(model_cards) > 1:
+        with st.container(border=True):
+            st.markdown("#### Side-by-side comparison")
+            st.caption("Compare the two LightGBM models by trees, depth, leaves, and input width.")
+            st.plotly_chart(
+                comparison_fig,
+                use_container_width=True,
+                config={"displayModeBar": False},
+                key="insights_architecture_comparison",
+            )
+
+    _render_training_footprint_panel(training_info)
 
 
 @st.cache_data(show_spinner=False)
@@ -96,6 +385,26 @@ def _stakeholder_architecture_figure():
         )
 
     fig = go.Figure()
+    fig.add_shape(
+        type="rect",
+        x0=0.01,
+        y0=0.52,
+        x1=0.99,
+        y1=0.94,
+        line=dict(color="rgba(226,232,240,0.55)", width=1),
+        fillcolor="rgba(248,250,252,0.95)",
+        layer="below",
+    )
+    fig.add_shape(
+        type="rect",
+        x0=0.20,
+        y0=0.02,
+        x1=0.77,
+        y1=0.40,
+        line=dict(color="rgba(167,243,208,0.45)", width=1),
+        fillcolor="rgba(240,253,250,0.80)",
+        layer="below",
+    )
     box_specs = [
         {
             "x0": 0.03,
@@ -255,6 +564,36 @@ def _stakeholder_architecture_figure():
         font=dict(size=15, color="#0f172a"),
         align="center",
     )
+    fig.add_annotation(
+        x=0.50,
+        y=0.945,
+        text="The top lane shows model processing. The lower lane shows where human oversight changes the outcome.",
+        showarrow=False,
+        font=dict(size=11, color="#475569"),
+        align="center",
+    )
+    fig.add_annotation(
+        x=0.08,
+        y=0.925,
+        text="<b>AI pipeline</b>",
+        showarrow=False,
+        font=dict(size=11, color="#334155"),
+        bgcolor="rgba(255,255,255,0.88)",
+        bordercolor="rgba(203,213,225,0.8)",
+        borderwidth=1,
+        borderpad=4,
+    )
+    fig.add_annotation(
+        x=0.28,
+        y=0.385,
+        text="<b>Human control lane</b>",
+        showarrow=False,
+        font=dict(size=11, color="#065f46"),
+        bgcolor="rgba(255,255,255,0.88)",
+        bordercolor="rgba(167,243,208,0.8)",
+        borderwidth=1,
+        borderpad=4,
+    )
 
     fig.update_xaxes(visible=False, range=[0, 1])
     fig.update_yaxes(visible=False, range=[0, 1])
@@ -392,6 +731,26 @@ def _model_decision_pipeline_figure():
         )
 
     fig = go.Figure()
+    fig.add_shape(
+        type="rect",
+        x0=0.03,
+        y0=0.03,
+        x1=0.71,
+        y1=0.94,
+        line=dict(color="rgba(226,232,240,0.55)", width=1),
+        fillcolor="rgba(248,250,252,0.95)",
+        layer="below",
+    )
+    fig.add_shape(
+        type="rect",
+        x0=0.72,
+        y0=0.18,
+        x1=0.99,
+        y1=0.58,
+        line=dict(color="rgba(221,214,254,0.55)", width=1),
+        fillcolor="rgba(250,245,255,0.88)",
+        layer="below",
+    )
     main_boxes = [
         {
             "coords": (0.07, 0.78, 0.69, 0.91),
@@ -498,6 +857,36 @@ def _model_decision_pipeline_figure():
         showarrow=False,
         font=dict(size=16, color="#0f172a"),
         align="center",
+    )
+    fig.add_annotation(
+        x=0.50,
+        y=0.945,
+        text="The main lane scores risk first. The side lane adds threat type and rules only for suspicious cases.",
+        showarrow=False,
+        font=dict(size=11, color="#475569"),
+        align="center",
+    )
+    fig.add_annotation(
+        x=0.16,
+        y=0.925,
+        text="<b>Core scoring lane</b>",
+        showarrow=False,
+        font=dict(size=11, color="#334155"),
+        bgcolor="rgba(255,255,255,0.88)",
+        bordercolor="rgba(203,213,225,0.8)",
+        borderwidth=1,
+        borderpad=4,
+    )
+    fig.add_annotation(
+        x=0.85,
+        y=0.555,
+        text="<b>Context branch</b>",
+        showarrow=False,
+        font=dict(size=11, color="#6d28d9"),
+        bgcolor="rgba(255,255,255,0.90)",
+        bordercolor="rgba(221,214,254,0.9)",
+        borderwidth=1,
+        borderpad=4,
     )
     add_pill(
         0.85,
@@ -626,6 +1015,9 @@ def _render_model_transparency_card(nonce, role):
         unsafe_allow_html=True,
     )
 
+    if _is_summary_role(role):
+        _render_insights_takeaway(role)
+
     flow = _model_decision_pipeline_figure()
 
     top_left, top_right = st.columns([1.26, 0.94], vertical_alignment="top")
@@ -644,7 +1036,7 @@ def _render_model_transparency_card(nonce, role):
         _render_transparency_side_panel(metrics, training_info, threshold, type_metrics)
 
     def render_technical_details():
-        tabs = st.tabs(["How decisions are made", "What influences the model", "Current model settings"])
+        tabs = st.tabs(["How decisions are made", "What influences the model", "Model architecture", "Current model settings"])
 
         with tabs[0]:
             st.caption("Decision flow")
@@ -667,15 +1059,13 @@ def _render_model_transparency_card(nonce, role):
             importance = _get_global_importance_df()
             if importance is not None and len(importance) > 0:
                 top_importance = importance.head(10)
-                fig = px.bar(
-                    top_importance.sort_values("mean_abs_shap"),
-                    x="mean_abs_shap",
-                    y="feature",
-                    orientation="h",
+                fig = _feature_importance_figure(
+                    top_importance,
                     title="Top features driving anomaly decisions",
+                    height=340,
                 )
                 st.plotly_chart(
-                    style_plotly_figure(fig, height=340, show_legend=True),
+                    fig,
                     use_container_width=True,
                     config={"displayModeBar": False},
                     key=f"transparency_top_features_{nonce}",
@@ -684,6 +1074,10 @@ def _render_model_transparency_card(nonce, role):
                 render_focus_callout("Model setup needed", "Run model setup to show the most influential features.", variant="warning")
 
         with tabs[2]:
+            st.caption("Architecture")
+            _render_model_architecture_panel()
+
+        with tabs[3]:
             st.caption("Configuration")
             settings_df = pd.DataFrame(
                 [
@@ -700,7 +1094,7 @@ def _render_model_transparency_card(nonce, role):
             settings_df["Value"] = settings_df["Value"].astype(str)
             st.table(settings_df)
 
-    with st.expander("Open technical transparency detail", expanded=False):
+    with st.expander("Open model logic and architecture", expanded=False):
         render_technical_details()
 
     render_section_card(
@@ -740,7 +1134,7 @@ def render_insights_tab(role):
     _render_model_transparency_card(nonce, role)
     render_section_card(
         "Technical evidence",
-        "Open the diagnostics below for feature importance, calibration, and the glossary.",
+        "Open the diagnostics below for feature impact, reliability, and the telemetry glossary.",
         kicker="Deep dive",
     )
 
@@ -755,9 +1149,13 @@ def render_insights_tab(role):
                 importance = _get_global_importance_df()
                 if importance is not None and len(importance) > 0:
                     top_importance = importance.head(18)
-                    fig = px.bar(top_importance, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact")
+                    fig = _feature_importance_figure(
+                        top_importance,
+                        title="Global feature impact",
+                        height=420,
+                    )
                     st.plotly_chart(
-                        style_plotly_figure(fig, height=420),
+                        fig,
                         use_container_width=True,
                         config={"displayModeBar": False},
                         key=f"global_importance_{nonce}",
@@ -784,15 +1182,9 @@ def render_insights_tab(role):
                             bin_y.append(y_test[mask].mean())
                     if bin_p:
                         reliability = pd.DataFrame({"confidence": bin_p, "empirical": bin_y})
-                        fig = px.line(
-                            reliability,
-                            x="confidence",
-                            y="empirical",
-                            title=f"Reliability (Brier {evaluation.get('brier', np.nan):.3f})",
-                        )
-                        fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="perfect")
+                        fig = _calibration_figure(reliability, evaluation.get("brier", np.nan))
                         st.plotly_chart(
-                            style_plotly_figure(fig, height=420, show_legend=True),
+                            fig,
                             use_container_width=True,
                             config={"displayModeBar": False},
                             key=f"calibration_curve_{nonce}",
@@ -812,5 +1204,5 @@ def render_insights_tab(role):
                 )
             )
 
-    with st.expander("Open model diagnostics and glossary", expanded=False):
+    with st.expander("Open diagnostics and glossary", expanded=False):
         render_detailed_analysis()

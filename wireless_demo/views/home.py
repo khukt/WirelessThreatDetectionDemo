@@ -11,7 +11,7 @@ from ..ux import (
 
 QUICK_PATHS = [
     ("overview", "Overview", "Start with the live posture of the fleet and current risk pattern.", "Recommended first stop", True),
-    ("incidents", "Incidents", "Review alerts, evidence, and human decisions.", "Triage queue", False),
+    ("incidents", "Incidents", "Review alerts, evidence, and the human review path.", "Triage queue", False),
     ("insights", "Insights", "Explain the AI behavior, confidence checks, and trust story.", "Explain + trust", False),
 ]
 
@@ -57,7 +57,7 @@ def _render_project_banner(role, scenario, profile):
             <div class="home-project-kicker">Home hub</div>
             <div class="home-project-title">TRUST AI — Scenario landing page</div>
             <div class="home-project-copy">
-                Use this page to understand the current threat scenario, align the audience, and then jump into the right part of the demo.
+                Use this page to understand the current threat scenario, align the audience, and then jump into the right part of the demo with the trust and review story already in view.
             </div>
             <div class="home-project-chip-row">
                 <span class="home-project-chip">Profile: {profile}</span>
@@ -81,7 +81,7 @@ def _open_home_destination(tab_name: str, message: str):
 def _render_attack_academy_home(role, scenario):
     render_section_card(
         "Understand the current scenario",
-        "Use this section to explain what the selected attack means, why it matters, and what viewers should expect next.",
+        "Use this section to explain what the selected attack means, why it matters, and what viewers should expect next before the model and review flow begin.",
         kicker="Attack Academy",
     )
     render_current_attack_brief(scenario, role, title="Current scenario explainer")
@@ -124,7 +124,7 @@ def _render_explore_destinations():
 def _render_customize_walkthrough(role, scenario):
     render_section_card(
         "Set scenario and audience",
-        "Adjust the scenario and audience framing here before moving into the deeper tabs.",
+        "Adjust the scenario and audience framing here before moving into the deeper tabs and trust-focused views.",
         kicker="Customize",
     )
     scenario_options = [name for _, name, _ in SCENARIO_BUTTONS]
@@ -151,7 +151,7 @@ def _render_customize_walkthrough(role, scenario):
     if action_cols[1].button("Open live monitoring", key="home_open_overview", use_container_width=True):
         _open_home_destination("Overview", "Opened Overview. Start with the live posture and risk picture.")
     if action_cols[2].button("Open incidents", key="home_open_incidents", use_container_width=True):
-        _open_home_destination("Incidents", "Opened Incidents. Review the queue and evidence next.")
+        _open_home_destination("Incidents", "Opened Incidents. Review the queue, evidence, and human review state next.")
 
 
 def _render_setup_status():
@@ -167,13 +167,14 @@ def _render_setup_status():
         st.session_state.home_message = "Model setup completed. You can now use the live monitoring tabs."
         st.rerun()
     if setup_cols[1].button("Open Insights", key="home_open_insights", use_container_width=True, type="secondary"):
-        _open_home_destination("Insights", "Opened Insights. Use this view to explain model behavior and trust controls.")
+        _open_home_destination("Insights", "Opened Insights. Use this view to explain model behavior, confidence checks, and trust controls.")
     with setup_cols[2]:
         with st.container(border=True):
             st.markdown(
                 "- **Anomaly detector**: LightGBM binary classifier.  \n"
                 "- **Threat typing**: LightGBM multiclass model + rules.  \n"
-                "- **Confidence controls**: thresholding + conformal calibration."
+                "- **Confidence checks**: thresholding + conformal calibration.  \n"
+                "- **Human review**: remains in control of the final decision."
             )
 
 

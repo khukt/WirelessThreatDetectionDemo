@@ -12,7 +12,7 @@ ROLE_INCIDENTS_CALLOUT = {
     "Domain Expert": "This is the main analyst workspace for triage, evidence review, and deciding whether alerts match domain reality.",
     "Regulator": "Look for understandable incidents, visible human review, and clear paths for approval, rejection, or escalation.",
     "AI Builder": "Inspect how model output becomes operator-facing incidents and how human feedback changes suppression and prioritization.",
-    "Executive": "Use this page to see what actions operators would take and how much human oversight is built into response.",
+    "Executive": "Use this page to see what actions operators would take and how human review remains in control of response.",
 }
 def _incident_review_status(incident):
     status = get_review_status(incident)
@@ -74,17 +74,17 @@ def render_incidents_tab(role, refresh_interval=None):
 
     render_section_card(
         "Incidents",
-        "This is the analyst queue for sorting, filtering, and reviewing incidents before follow-up actions are taken.",
+        "This is the analyst queue for sorting, filtering, and reviewing incidents before follow-up actions are taken, with human review remaining in control.",
         kicker="Triage workspace",
     )
 
     render_section_card(
         "Queue filters",
-        "Use these controls to focus the queue before switching categories or reviewing incident cards.",
+        "Use these controls to focus the queue before switching categories or reviewing incident cards, while keeping review state visible.",
         kicker="Filtering",
     )
     with st.container(border=True):
-        st.markdown("<div class='quick-chip-row'><span class='quick-chip'>Tip: start with highest severity</span><span class='quick-chip'>Review status stays visible on each card</span><span class='quick-chip'>Search accepts device, scenario, or threat family</span></div>", unsafe_allow_html=True)
+        st.markdown("<div class='quick-chip-row'><span class='quick-chip'>Tip: start with highest severity</span><span class='quick-chip'>Human review state stays visible on each card</span><span class='quick-chip'>Search accepts device, scenario, or threat family</span></div>", unsafe_allow_html=True)
         control_cols = st.columns([1.2, 1, 1, 1, 0.8])
         max_items = control_cols[0].slider("Incidents per view", 5, 100, min(25, len(all_incidents)), 5, key="incidents_max_items")
         sort_by = control_cols[1].selectbox(
@@ -167,7 +167,7 @@ def render_incidents_tab(role, refresh_interval=None):
 
         if search_query or len(severity_filter) < 3 or len(review_states) < 3 or sort_by != "Newest first":
             st.caption(
-                f"Showing {len(filtered_all)} of {len(all_incidents)} incidents · sorted by {sort_by.lower()}"
+                f"Showing {len(filtered_all)} of {len(all_incidents)} incidents · sorted by {sort_by.lower()} · human review state preserved"
             )
 
         if not filtered_all:
@@ -185,7 +185,7 @@ def render_incidents_tab(role, refresh_interval=None):
             with tabs[idx]:
                 render_section_card(
                     f"{cat} incidents",
-                    "These incidents share the same attack family after the current triage filters and queue ordering.",
+                    "These incidents share the same attack family after the current triage filters and queue ordering, with review state still visible.",
                     kicker="Category view",
                 )
                 st.caption(f"{len(category_map[cat])} incidents in {cat.lower()} after the current triage filters.")
@@ -202,7 +202,7 @@ def render_incidents_tab(role, refresh_interval=None):
         with tabs[-1]:
             render_section_card(
                 "All filtered incidents",
-                "This tab shows the full queue after all current filters and sorting rules are applied.",
+                "This tab shows the full queue after all current filters and sorting rules are applied, with human review still in control of the next step.",
                 kicker="Combined view",
             )
             shown = 0
