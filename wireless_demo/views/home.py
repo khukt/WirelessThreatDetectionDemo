@@ -21,23 +21,23 @@ from ..ux import (
 
 ROLE_HOME_COPY = {
     "End User": {
-        "headline": "Start the demo with a simple guided path.",
-        "body": "This demo shows how AI can monitor wireless operations, raise suspicious events, and keep people in control of the final decision.",
+        "headline": "Start with the simplest view of the story.",
+        "body": "This demo shows how AI monitors wireless operations, flags suspicious behavior, and keeps people in charge of the final decision.",
     },
     "Domain Expert": {
         "headline": "Start with the scenario and analyst workflow.",
-        "body": "This demo combines wireless telemetry, anomaly detection, threat typing, and human review so you can validate whether the signals match operational reality.",
+        "body": "This demo combines telemetry, anomaly detection, threat typing, and human review so you can judge whether the signals match operational reality.",
     },
     "Regulator": {
-        "headline": "Start with a high-level assurance view.",
-        "body": "This demo is designed to show not only AI outputs, but also the transparency, confidence controls, and human oversight around those outputs.",
+        "headline": "Start with an assurance-first view.",
+        "body": "This demo shows not only AI outputs, but also the transparency, confidence controls, and human oversight around those outputs.",
     },
     "AI Builder": {
-        "headline": "Start by choosing what system behavior you want to test.",
-        "body": "This demo lets you explore the full loop from synthetic telemetry to anomaly scoring, attack typing, review actions, and governance evidence.",
+        "headline": "Start by choosing the behavior you want to test.",
+        "body": "This demo covers the full loop from synthetic telemetry to anomaly scoring, threat typing, review actions, and governance evidence.",
     },
     "Executive": {
-        "headline": "Start with the business story of the demo.",
+        "headline": "Start with the business story.",
         "body": "This demo explains how the system detects wireless threats, highlights operational risk, and shows where trust and accountability controls sit around the AI.",
     },
 }
@@ -70,18 +70,43 @@ PROJECT_SUMMARY_CARDS = [
     (
         "Project value",
         "Trustworthy wireless AI",
-        "Demonstrates how anomaly detection, threat typing, and human oversight can be combined into a project-ready story for smart industry and 6G-adjacent operations.",
+        "Shows how anomaly detection, threat typing, and human oversight can be combined into a credible wireless-AI story.",
     ),
     (
         "What visitors get",
         "Guided, role-aware journey",
-        "Each audience sees the same system through a tailored explanation layer, making the demo friendlier for research showcases, stakeholder meetings, and classroom walkthroughs.",
+        "Each audience sees the same system through a tailored explanation layer for demos, stakeholder briefings, and teaching.",
     ),
     (
         "Best starting point",
         "Pick a scenario, then a role",
-        "The Home page now acts like a project hub: it explains purpose first, then helps visitors jump into Overview, Incidents, Insights, or Governance with the right context.",
+        "Home explains the purpose first, then helps visitors move into Overview, Incidents, Insights, or Governance with the right context.",
     ),
+]
+
+MODEL_STACK = [
+    (
+        "insights",
+        "Stage 1 · Anomaly detector",
+        "A LightGBM binary classifier scores whether recent device behavior looks suspicious from rolling telemetry features.",
+    ),
+    (
+        "governance",
+        "Stage 2 · Threat typing",
+        "A LightGBM multiclass model plus domain rules estimates whether the pattern looks like Jamming, Breach, Spoofing, or Tamper.",
+    ),
+    (
+        "ready",
+        "Confidence and oversight",
+        "Thresholding, conformal calibration, and human review keep the demo focused on reviewable decision support.",
+    ),
+]
+
+INCLUDED_CAPABILITIES = [
+    ("Live monitoring", "Fleet posture, map context, risk rankings, and queue summaries."),
+    ("Incident triage", "Review evidence, approve, dismiss, or escalate suspicious events."),
+    ("Model transparency", "Feature importance, calibration, architecture views, and settings snapshots."),
+    ("Governance views", "HITL status, audit trail, and trustworthy AI pillar framing."),
 ]
 
 
@@ -122,12 +147,11 @@ def _render_project_banner(role, scenario, profile):
     st.markdown(
         f"""
         <div class="home-project-shell">
-            <div class="home-project-kicker">Project-friendly landing page</div>
+            <div class="home-project-kicker">Demo overview</div>
             <div class="home-project-title">TRUST AI — Wireless Threat Detection Demo Hub</div>
             <div class="home-project-copy">
-                A project showcase for trustworthy wireless threat detection in smart industry settings. Use this landing page
-                to explain the purpose of the demo, align the audience to the right role, and move quickly from project overview
-                to live posture, incident triage, model transparency, and governance evidence.
+                A presentation-ready overview of a trustworthy wireless threat detection workflow for smart-industry settings.
+                Use this page to explain the demo, align the audience, and then move into monitoring, incidents, transparency, or governance.
             </div>
             <div class="home-project-chip-row">
                 <span class="home-project-chip">Profile: {profile}</span>
@@ -158,6 +182,68 @@ def _render_project_summary_grid():
             )
 
 
+def _render_presentation_overview(role, scenario, profile):
+    scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
+    role_copy = ROLE_HOME_COPY.get(role, ROLE_HOME_COPY["End User"])
+    included_html = "".join(
+        [
+            f"<div class='home-include-item'><div class='home-include-title'>{title}</div><div class='home-include-copy'>{copy}</div></div>"
+            for title, copy in INCLUDED_CAPABILITIES
+        ]
+    )
+    stack_html = "".join(
+        [
+            f"<div class='home-stack-row'>{icon_badge_html(icon, 'sm')}<div><div class='home-stack-title'>{title}</div><div class='home-stack-copy'>{copy}</div></div></div>"
+            for icon, title, copy in MODEL_STACK
+        ]
+    )
+    st.markdown(
+        f"""
+        <div class='home-presentation-grid'>
+            <div class='home-presentation-card'>
+                <div class='home-presentation-kicker'>What this demo is</div>
+                <div class='home-presentation-title'>A trustworthy wireless threat detection showcase</div>
+                <div class='home-presentation-copy'>
+                    This demo shows how AI can monitor simulated wireless telemetry, surface suspicious behavior,
+                    label likely threat families, and keep humans accountable for the final decision.
+                </div>
+                <ul class='home-presentation-list'>
+                    <li>Built for presentations, research demos, teaching, and stakeholder briefings.</li>
+                    <li>Role-aware views make the same system understandable for operators, regulators, engineers, and executives.</li>
+                    <li>Current scenario: <strong>{scenario}</strong> · Profile: <strong>{profile}</strong> · Audience: <strong>{role}</strong>.</li>
+                    <li>Current storytelling cue: <strong>{scenario_copy['signals']}</strong>.</li>
+                </ul>
+            </div>
+            <div class='home-presentation-card'>
+                <div class='home-presentation-kicker'>What models we use</div>
+                <div class='home-presentation-title'>A two-stage detection and explanation stack</div>
+                <div class='home-presentation-copy'>
+                    The demo does not rely on a single black-box score. It combines anomaly detection, threat typing,
+                    confidence controls, and human review in one explainable workflow.
+                </div>
+                {stack_html}
+            </div>
+            <div class='home-presentation-card'>
+                <div class='home-presentation-kicker'>What is included</div>
+                <div class='home-presentation-title'>Everything needed for a guided walkthrough</div>
+                <div class='home-presentation-copy'>
+                    The app includes monitoring, review workflows, transparency views, and governance evidence,
+                    so you can explain both system behavior and trust controls from one place.
+                </div>
+                <div class='home-include-grid'>
+                    {included_html}
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<div class='home-hero'><div class='home-hero-title'>{role_copy['headline']}</div><div class='home-hero-copy'>{role_copy['body']}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _section_container(title, compact_mode, expanded=False):
     if compact_mode:
         return st.expander(title, expanded=expanded)
@@ -169,7 +255,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     render_header(profile, scenario, role)
     render_quickstart(help_mode, show_eu_status, scenario)
     _render_project_banner(role, scenario, profile)
-    _render_project_summary_grid()
+    _render_presentation_overview(role, scenario, profile)
     render_demo_storyline(
         model_ready=st.session_state.get("model") is not None,
         incident_count=len(st.session_state.get("incidents", [])),
@@ -190,7 +276,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
 
     render_section_card(
         "Demo snapshot",
-        "These high-level metrics help visitors quickly understand project scale, current alert load, model quality, and how recently the demo was refreshed.",
+        "These high-level metrics summarize current scale, alert load, model quality, and refresh status.",
         kicker="At a glance",
     )
     with st.container(border=True):
@@ -215,18 +301,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         "Compact mode collapses the Home sections for faster scanning. Turn it off for the full walkthrough on one page."
     )
 
-    role_copy = ROLE_HOME_COPY.get(role, ROLE_HOME_COPY["End User"])
     scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
-
-    st.markdown(
-        f"""
-        <div class="home-hero">
-            <div class="home-hero-title">{role_copy['headline']}</div>
-            <div class="home-hero-copy">{role_copy['body']}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     with _section_container("Model status", compact_mode, expanded=st.session_state.get("model") is not None):
         render_section_card(
@@ -247,18 +322,18 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     with _section_container("About this demo", compact_mode, expanded=True):
         render_section_card(
             "About this demo",
-            "Use this summary to explain the end-to-end project story: telemetry comes in, AI highlights suspicious behavior, attack typing adds meaning, and humans stay in control of the final decision.",
+            "Use this summary when you want a short explanation of what the demo does, how the model stack works, and what is included.",
             kicker="Storyline",
         )
         top_left, top_right = st.columns([1.15, 0.85])
         with top_left:
             with st.container(border=True):
                 st.markdown(
-                    "- Watches simulated wireless and logistics telemetry across a fleet.  \n"
-                    "- Detects suspicious behavior with an anomaly model.  \n"
-                    "- Explains the likely threat type with model output plus domain rules.  \n"
-                    "- Keeps a human reviewer in the loop for approve, dismiss, or escalate decisions.  \n"
-                    "- Packages the workflow into a role-aware project demo for operations, research, and assurance audiences."
+                    "- Explains a trustworthy-AI workflow for wireless threat detection.  \n"
+                    "- Uses synthetic telemetry so the full story can be shown safely.  \n"
+                    "- Combines anomaly detection, threat typing, confidence controls, and human review.  \n"
+                    "- Includes monitoring, incident handling, transparency views, and governance evidence.  \n"
+                    "- Is designed for presentations and discussion rather than production deployment."
                 )
         with top_right:
             scenario_icon = {
@@ -268,7 +343,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
                 "GPS Spoofing (subset)": "spoofing",
                 "Data Tamper (gateway)": "tamper",
             }.get(scenario, "scenario")
-            _render_card(scenario_icon, scenario, scenario_copy["summary"], chip=f"Watch for: {scenario_copy['signals']}")
+            _render_card(scenario_icon, scenario, scenario_copy["summary"], chip=f"Includes: monitoring, triage, transparency, governance")
 
     with _section_container("Start here", compact_mode, expanded=not st.session_state.get("model") is not None):
         render_section_card(

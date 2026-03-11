@@ -35,6 +35,34 @@ ICON_BADGES = {
     "ready": ("OK", "rgba(21, 128, 61, 0.05)", "rgba(21, 128, 61, 0.10)", "#166534"),
 }
 
+ICON_SVG_PATHS = {
+    "home": "<path d='M3 10.5 12 3l9 7.5'/><path d='M5.5 9.5V21h13V9.5'/>",
+    "overview": "<path d='M4 12a8 8 0 0 1 16 0'/><path d='M7 12a5 5 0 0 1 10 0'/><path d='M12 12l4-4'/><circle cx='12' cy='12' r='1.2' fill='currentColor' stroke='none'/>",
+    "fleet": "<rect x='3' y='7' width='11' height='8' rx='1.5'/><path d='M14 9h3l3 3v3h-6Z'/><circle cx='8' cy='17' r='1.5'/><circle cx='17' cy='17' r='1.5'/>",
+    "incidents": "<path d='M12 4 21 20H3Z'/><path d='M12 9v5'/><circle cx='12' cy='17' r='1' fill='currentColor' stroke='none'/>",
+    "insights": "<path d='M5 17 10 12l3 3 6-7'/><path d='M5 5v14h14'/>",
+    "governance": "<path d='M12 3 19 6v6c0 4.5-2.8 7.4-7 9-4.2-1.6-7-4.5-7-9V6l7-3Z'/><path d='m9.5 12 1.7 1.7L15 10' />",
+    "normal": "<circle cx='12' cy='12' r='8'/><path d='m8.5 12 2.2 2.2L15.8 9' />",
+    "jamming": "<path d='M12 5v6'/><path d='M8 8a6 6 0 0 1 8 0'/><path d='M5 5a10 10 0 0 1 14 0'/><path d='m4 20 16-16' />",
+    "breach": "<rect x='5' y='11' width='14' height='9' rx='2'/><path d='M9 11V8a3 3 0 0 1 5.5-1.8'/><path d='M15 8h3' />",
+    "spoofing": "<circle cx='12' cy='12' r='7'/><path d='M12 5v2.5M12 16.5V19M5 12h2.5M16.5 12H19'/><circle cx='12' cy='12' r='1.6' fill='currentColor' stroke='none'/>",
+    "tamper": "<path d='M8 3h6l4 4v14H8Z'/><path d='M14 3v4h4'/><path d='M10 12h6M10 16h4'/>",
+    "end_user": "<circle cx='12' cy='8' r='3'/><path d='M6 19c1.5-3 4-4.5 6-4.5s4.5 1.5 6 4.5'/>",
+    "domain_expert": "<circle cx='10' cy='10' r='4'/><path d='m13 13 5 5'/><path d='M8.5 10h3M10 8.5v3'/>",
+    "regulator": "<path d='M12 5v14'/><path d='M7 8h10'/><path d='m8.5 8-2.5 4h5ZM18.5 8 16 12h5Z'/>",
+    "ai_builder": "<rect x='7' y='7' width='10' height='10' rx='2'/><path d='M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3'/>",
+    "executive": "<path d='M5 19V9M10 19V5M15 19v-7M20 19v-11'/>",
+    "step_1": "<path d='M10 7h2v10'/><path d='M8 17h6'/>",
+    "step_2": "<path d='M8.5 9a3.5 3.5 0 0 1 7 0c0 2.5-2.5 3.4-4.5 5.5h4.5'/><path d='M8 17h8'/>",
+    "step_3": "<path d='M9 8.5c.6-.8 1.6-1.5 3-1.5 2 0 3.5 1.1 3.5 2.9 0 1.4-.8 2.1-2 2.6 1.5.4 2.5 1.3 2.5 2.9 0 2.1-1.8 3.6-4.2 3.6-1.9 0-3.2-.7-4-1.9'/>",
+    "scenario": "<path d='M4 18h16'/><path d='M7 15 11 11l3 2 5-6'/>",
+    "setup": "<circle cx='12' cy='12' r='3'/><path d='M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1'/>",
+    "navigator": "<path d='M4 5h16v14H4Z'/><path d='M8 9h8M8 13h8M8 17h5'/>",
+    "notice": "<circle cx='12' cy='12' r='8'/><path d='M12 8v5'/><circle cx='12' cy='16.5' r='1' fill='currentColor' stroke='none'/>",
+    "cache": "<ellipse cx='12' cy='6.5' rx='6.5' ry='2.5'/><path d='M5.5 6.5v7c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5v-7'/><path d='M5.5 10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5'/>",
+    "ready": "<circle cx='12' cy='12' r='8'/><path d='m8.5 12 2.2 2.2L15.8 9' />",
+}
+
 
 SCENARIO_COPY = {
     "Normal": {
@@ -336,11 +364,25 @@ def inject_global_styles():
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
         }
+        .pro-icon-badge svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.85;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex: 0 0 auto;
+        }
         .pro-icon-badge--sm {
             min-width: 28px;
             height: 28px;
             padding: 0 0.45rem;
             font-size: 0.68rem;
+        }
+        .pro-icon-badge--sm svg {
+            width: 14px;
+            height: 14px;
         }
         .pro-icon-badge--md {
             min-width: 34px;
@@ -348,12 +390,20 @@ def inject_global_styles():
             padding: 0 0.55rem;
             font-size: 0.7rem;
         }
+        .pro-icon-badge--md svg {
+            width: 16px;
+            height: 16px;
+        }
         .pro-icon-badge--lg {
             min-width: 42px;
             height: 42px;
             padding: 0 0.7rem;
             font-size: 0.78rem;
             border-radius: 16px;
+        }
+        .pro-icon-badge--lg svg {
+            width: 18px;
+            height: 18px;
         }
         .inline-icon-heading {
             display: flex;
@@ -958,6 +1008,92 @@ def inject_global_styles():
             font-size: 0.75rem;
             font-weight: 700;
         }
+        .home-presentation-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            gap: 0.75rem;
+            margin: 0.35rem 0 0.8rem;
+        }
+        .home-presentation-card {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 22px;
+            padding: 0.95rem 1rem;
+            background: rgba(255,255,255,0.92);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+            min-height: 220px;
+        }
+        .home-presentation-kicker {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.72);
+            font-weight: 700;
+            margin-bottom: 0.28rem;
+        }
+        .home-presentation-title {
+            font-size: 1.08rem;
+            font-weight: 800;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.3rem;
+        }
+        .home-presentation-copy {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: rgba(49, 51, 63, 0.78);
+            margin-bottom: 0.55rem;
+        }
+        .home-presentation-list {
+            margin: 0;
+            padding-left: 1.05rem;
+            color: rgba(49, 51, 63, 0.82);
+            font-size: 0.86rem;
+            line-height: 1.55;
+        }
+        .home-stack-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+            padding: 0.62rem 0;
+            border-top: 1px solid rgba(49, 51, 63, 0.08);
+        }
+        .home-stack-row:first-of-type {
+            border-top: none;
+            padding-top: 0.1rem;
+        }
+        .home-stack-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.96);
+            margin-bottom: 0.12rem;
+        }
+        .home-stack-copy {
+            font-size: 0.82rem;
+            line-height: 1.42;
+            color: rgba(49, 51, 63, 0.74);
+        }
+        .home-include-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.2rem;
+        }
+        .home-include-item {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            padding: 0.68rem 0.72rem;
+            background: rgba(248,250,252,0.92);
+        }
+        .home-include-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.96);
+            margin-bottom: 0.1rem;
+        }
+        .home-include-copy {
+            font-size: 0.77rem;
+            line-height: 1.4;
+            color: rgba(49, 51, 63, 0.74);
+        }
         .home-mini-card {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 18px;
@@ -1298,6 +1434,10 @@ def inject_global_styles():
             .footer-sponsor-grid {
                 grid-template-columns: 1fr;
             }
+            .home-presentation-grid,
+            .home-include-grid {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """,
@@ -1341,9 +1481,15 @@ def render_header(profile: str, scenario: str, role: str):
 
 def icon_badge_html(name: str, size: str = "md") -> str:
     label, bg, border, fg = ICON_BADGES.get(name, ICON_BADGES["navigator"])
+    svg = ICON_SVG_PATHS.get(name)
+    content = (
+        f"<svg viewBox='0 0 24 24' aria-hidden='true' focusable='false'>{svg}</svg>"
+        if svg
+        else label
+    )
     return (
         f"<span class='pro-icon-badge pro-icon-badge--{size}' "
-        f"style='background:{bg};border-color:{border};color:{fg};'>{label}</span>"
+        f"style='background:{bg};border-color:{border};color:{fg};'>{content}</span>"
     )
 
 
