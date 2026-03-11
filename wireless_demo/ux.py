@@ -1,4 +1,3 @@
-import base64
 import time
 from textwrap import dedent
 from typing import Optional
@@ -267,20 +266,6 @@ def fetch_logo_bytes(url: str) -> Optional[bytes]:
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.content
-
-
-def logo_src(url: str, logo_bytes: Optional[bytes]) -> str:
-    if not logo_bytes:
-        return url
-    lower_url = url.lower()
-    if lower_url.endswith(".svg"):
-        mime = "image/svg+xml"
-    elif lower_url.endswith(".jpg") or lower_url.endswith(".jpeg"):
-        mime = "image/jpeg"
-    else:
-        mime = "image/png"
-    encoded = base64.b64encode(logo_bytes).decode("ascii")
-    return f"data:{mime};base64,{encoded}"
 
 
 def inject_global_styles():
@@ -644,6 +629,78 @@ def inject_global_styles():
             font-size: 0.94rem;
             color: rgba(49, 51, 63, 0.78);
         }
+        .home-project-shell {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 24px;
+            padding: 1.05rem 1.1rem;
+            background: linear-gradient(135deg, rgba(239,246,255,0.98), rgba(255,255,255,0.94));
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+            margin-bottom: 0.75rem;
+        }
+        .home-project-kicker {
+            display: inline-block;
+            padding: 0.18rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(14, 165, 233, 0.10);
+            color: #0369a1;
+            font-size: 0.74rem;
+            font-weight: 700;
+            margin-bottom: 0.45rem;
+        }
+        .home-project-title {
+            font-size: 1.42rem;
+            line-height: 1.2;
+            font-weight: 800;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.28rem;
+        }
+        .home-project-copy {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: rgba(49, 51, 63, 0.78);
+        }
+        .home-project-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+        }
+        .home-project-chip {
+            display: inline-block;
+            padding: 0.22rem 0.58rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: rgba(15, 23, 42, 0.88);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .home-mini-card {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 18px;
+            padding: 0.8rem 0.9rem;
+            background: rgba(255,255,255,0.88);
+            min-height: 150px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+            margin-bottom: 0.55rem;
+        }
+        .home-mini-kicker {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(49, 51, 63, 0.56);
+            margin-bottom: 0.25rem;
+        }
+        .home-mini-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.22rem;
+        }
+        .home-mini-copy {
+            font-size: 0.88rem;
+            color: rgba(49, 51, 63, 0.75);
+            line-height: 1.45;
+        }
         .home-card {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 22px;
@@ -802,69 +859,6 @@ def inject_global_styles():
             background: rgba(71, 85, 105, 0.10);
             color: #475569;
             border-color: rgba(71, 85, 105, 0.18);
-        }
-        .fundingWrap {
-            text-align: center;
-            margin: 1.2rem 0 0.75rem;
-        }
-        .fundingTitle {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: rgba(15, 23, 42, 0.98);
-            margin-bottom: 0.35rem;
-        }
-        .fundingText {
-            font-size: 0.92rem;
-            color: rgba(49, 51, 63, 0.78);
-            line-height: 1.5;
-        }
-        .fundingGrid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.9rem;
-            margin: 0.8rem 0 1.1rem;
-        }
-        .fundingItem {
-            border: 1px solid rgba(49, 51, 63, 0.10);
-            border-radius: 18px;
-            padding: 0.9rem 0.8rem;
-            background: rgba(255,255,255,0.78);
-            text-align: center;
-        }
-        .fundingLogoSlot {
-            min-height: 88px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .fundingLogo {
-            max-width: 100%;
-            max-height: 56px;
-            object-fit: contain;
-        }
-        .fundingLogo.aurora {
-            max-height: 48px;
-        }
-        .fundingLink a {
-            color: #1d4ed8;
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .fundingLink a:hover {
-            text-decoration: underline;
-        }
-        .footerline {
-            margin: 1rem 0 0.4rem;
-            padding-top: 0.9rem;
-            border-top: 1px solid rgba(49, 51, 63, 0.10);
-            text-align: center;
-            font-size: 0.88rem;
-            color: rgba(49, 51, 63, 0.72);
-        }
-        @media (max-width: 900px) {
-            .fundingGrid {
-                grid-template-columns: 1fr;
-            }
         }
         .stTabs [data-baseweb="tab-list"] {
             gap: 0.35rem;

@@ -4,6 +4,8 @@ A **Streamlit-based interactive demo** for trustworthy anomaly detection in real
 It simulates Wi‑Fi/private‑5G, cellular, GNSS and integrity signals for a small fleet (AMRs, trucks, sensors, gateways) and
 demonstrates **transparent AI**: calibrated anomaly detection, attack typing, role-aware explanations, and EU AI Act–style governance.
 
+The app is designed as a **project-friendly demo hub**: the Home page gives visitors a guided landing experience, explains the project story in plain language, and provides clean entry points for operational, technical, regulatory, and executive audiences.
+
 > Mid Sweden University · TRUST AI — Realistic Wireless Threats (Sundsvall)  
 > Two‑step pipeline: **LightGBM anomaly detector** + **(LightGBM multiclass + rules) for attack typing**  
 > Persona‑aware XAI · Conformal risk calibration · Cached models (no retraining on refresh)
@@ -16,9 +18,20 @@ demonstrates **transparent AI**: calibrated anomaly detection, attack typing, ro
 - **Binary anomaly detector** with LightGBM, imbalance‑aware training, and **conformal p‑values** for calibrated risk.
 - **Attack typing head**: LightGBM multiclass + **domain rule fusion** (Jamming, Access Breach, GPS Spoofing, Data Tamper).
 - **Persona‑aware explanations** (End User, Domain Expert, Regulator, AI Builder, Executive).
+- **Project-friendly Home page** with guided onboarding, project summary cards, and audience-aware navigation.
 - **Interactive visuals**: PyDeck geospatial map, risk overlays, KPI heatmaps, incident dashboards.
 - **Governance tools**: model card export, audit log download, training explainer, and transparency artifacts.
 - **Caching** of trained models to avoid retraining on browser refresh.
+- **Bundled startup cache** for Streamlit Cloud so the default model can load on cold start before any retraining.
+
+---
+
+## 🧭 Project Overview
+
+- **Purpose:** show how trustworthy AI can support wireless threat monitoring in smart industry and logistics environments.
+- **Audience-ready:** the demo adapts guidance and explanation depth for End Users, Domain Experts, Regulators, AI Builders, and Executives.
+- **End-to-end story:** visitors can move from project context → live posture → incidents → model transparency → governance in one flow.
+- **Cloud-friendly startup:** the app uses a bundled model cache so Streamlit Cloud can load into a ready-to-demo state faster.
 
 ---
 
@@ -32,11 +45,20 @@ demonstrates **transparent AI**: calibrated anomaly detection, attack typing, ro
 
 ---
 
-## 🗂 Repository Layout (minimal)
+## 🗂 Repository Layout
 ```
 .
-├── app.py                  # Streamlit app (v2.0)
-└── README.md               # This file
+├── streamlit_app.py        # Thin Streamlit launcher
+├── wireless_demo/
+│   ├── app.py              # Main Streamlit UI orchestration
+│   ├── config.py           # Constants and configuration
+│   ├── helpers.py          # Shared utilities and explanations
+│   ├── logic.py            # Simulation, features, inference flow
+│   ├── state.py            # Session/model cache initialization
+│   ├── training.py         # Model training and calibration
+│   └── ui_components.py    # Incident and inspector UI helpers
+├── requirements.txt
+└── README.md
 ```
 > If you keep extra assets (icons, screenshots) add them under `assets/` and reference below.
 
@@ -70,9 +92,21 @@ pip install streamlit lightgbm scikit-learn shap plotly pydeck numpy pandas
 ## ▶️ Run
 
 ```bash
-streamlit run app.py
+chmod +x run_streamlit.sh
+./run_streamlit.sh
 ```
 Open your browser at **http://localhost:8501**.
+
+> On macOS, this launcher ensures the project `.venv` is used and exposes Homebrew `libomp` so `lightgbm` loads correctly.
+
+---
+
+## 🏠 Home Page Experience
+
+- **Project landing banner:** frames the demo as a showcase hub, not just a control screen.
+- **Summary cards:** explain project value, visitor benefit, and the best first step.
+- **Guided exploration:** scenario, role, and next-tab choices are presented as clear visual entry points.
+- **Project context:** funding acknowledgement and project links are available directly from the Home page.
 
 ---
 
@@ -135,6 +169,16 @@ Open your browser at **http://localhost:8501**.
 - **Synthetic** physics‑inspired telemetry only; **no personal data**.  
 - Rolling windows aggregate per‑device signals into engineered features.  
 - Export **data schema** & **incidents** from the Governance tab.
+
+---
+
+## 🤝 Funding
+
+- **VINNOVA** — Project reference `2024-03570` · https://www.vinnova.se/en/p/trustworthy-ai-and-mobile-generative-ai-for-6g-networks-and-smart-industry-applications/
+- **KK-stiftelsen** (The Knowledge Foundation) · https://www.kks.se/
+- **Interreg Aurora** · https://www.miun.se/en/Research/research-projects/ongoing-research-projects/trust---enhancing-wireless-communication--sensing-with-secure-resilient-and-trustworthy-solutions/
+
+Funding links are surfaced directly in the Home and Governance tabs for presentations and project demos.
 
 ---
 

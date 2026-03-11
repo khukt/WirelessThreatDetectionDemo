@@ -573,18 +573,29 @@ def tick_once(scenario, use_conformal):
                 feats_win = st.session_state.last_features.get(device_id, {})
                 rule_scores = compute_rule_scores_from_feats(feats_win, cellular_mode)
                 rule_vec = np.array([rule_scores["Jamming"], rule_scores["Breach"], rule_scores["Spoof"], rule_scores["Tamper"]], dtype=float)
+                full_classes = ["Breach", "Jamming", "Spoof", "Tamper"]
+                order_map = {"Breach": 1, "Jamming": 0, "Spoof": 2, "Tamper": 3}
 
                 if st.session_state.get("type_clf") is not None:
                     all_type_cols = st.session_state.type_cols
                     type_cols = [col for col in all_type_cols if col in cols]
                     xrow_full = x_scaled_df.iloc[[idx]]
                     xrow = xrow_full[type_cols] if type_cols else xrow_full
-                    probs_ml = st.session_state.type_clf.predict_proba(xrow)[0]
+                    raw_probs_ml = st.session_state.type_clf.predict_proba(xrow)[0]
                     gamma = st.session_state.get("type_metrics", {}).get("temp_gamma", 1.0)
-                    probs_ml = power_temp(probs_ml, gamma)[0]
+                    calibrated_probs_ml = power_temp(raw_probs_ml, gamma)[0]
+                    trained_class_indices = [int(class_idx) for class_idx in getattr(st.session_state.type_clf, "classes_", np.arange(len(calibrated_probs_ml)))]
 
-                    classes = st.session_state.get("type_labels", ["Breach", "Jamming", "Spoof", "Tamper"])
-                    order_map = {"Breach": 1, "Jamming": 0, "Spoof": 2, "Tamper": 3}
+                    probs_ml = np.zeros(len(full_classes), dtype=float)
+                    for prob_idx, class_idx in enumerate(trained_class_indices):
+                        if 0 <= class_idx < len(full_classes):
+                            probs_ml[class_idx] = calibrated_probs_ml[prob_idx]
+                    if probs_ml.sum() <= 0:
+                        probs_ml = np.ones(len(full_classes), dtype=float) / len(full_classes)
+                    else:
+                        probs_ml = probs_ml / probs_ml.sum()
+
+                    classes = full_classes
                     rule_vec_ordered = np.array([rule_vec[order_map[cls]] for cls in classes], dtype=float)
                     fused = (1.0 - TYPE_ALPHA) * probs_ml + TYPE_ALPHA * rule_vec_ordered
                     fused = fused / fused.sum()
@@ -603,17 +614,18 @@ def tick_once(scenario, use_conformal):
 
                     try:
                         type_explainer = st.session_state.get("type_explainer")
-                        if type_explainer is not None:
+                        if type_explainer is not None and best_idx in trained_class_indices:
                             type_vals = type_explainer.shap_values(xrow)
-                            if isinstance(type_vals, list) and len(type_vals) > best_idx:
-                                type_vec = type_vals[best_idx][0]
+                            shap_class_idx = trained_class_indices.index(best_idx)
+                            if isinstance(type_vals, list) and len(type_vals) > shap_class_idx:
+                                type_vec = type_vals[shap_class_idx][0]
                             else:
                                 type_vec = type_vals[0]
                             type_pairs = sorted(zip(xrow.columns, type_vec), key=lambda kv: abs(kv[1]), reverse=True)[:6]
                     except Exception:
                         type_pairs = []
                 else:
-                    classes = ["Breach", "Jamming", "Spoof", "Tamper"]
+                    classes = full_classes
                     probs_ml = [0.25, 0.25, 0.25, 0.25]
                     rule_vec_ordered = np.array([rule_vec[1], rule_vec[0], rule_vec[2], rule_vec[3]], dtype=float)
                     fused = rule_vec_ordered / rule_vec_ordered.sum()
@@ -640,7 +652,7 @@ def tick_once(scenario, use_conformal):
                     "type_probs_ml": probs_ml if isinstance(probs_ml, list) else probs_ml.tolist(),
                     "type_scores_rules": rule_vec_ordered if isinstance(rule_vec_ordered, list) else rule_vec_ordered.tolist(),
                     "type_probs_fused": fused if isinstance(fused, list) else fused.tolist(),
-                    "type_classes": list(st.session_state.get("type_labels", ["Breach", "Jamming", "Spoof", "Tamper"])),
+                    "type_classes": list(classes),
                     "type_margin": float(margin) if margin is not None else None,
                 }
 

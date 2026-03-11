@@ -70,6 +70,16 @@ def render_training_explainer(nonce: str):
             key=f"train_type_{nonce}",
         )
 
+    observed_classes = training_info.get("type_classes_observed", [])
+    missing_classes = training_info.get("type_classes_missing", [])
+    if observed_classes or missing_classes:
+        observed_text = ", ".join(observed_classes) if observed_classes else "None"
+        missing_text = ", ".join(missing_classes) if missing_classes else "None"
+        st.markdown(
+            f"- **Observed attack classes:** `{observed_text}`  \n"
+            f"- **Missing attack classes:** `{missing_text}`"
+        )
+
     metrics = st.session_state.get("metrics", {})
     if metrics:
         st.markdown(
@@ -329,6 +339,16 @@ def train_model_with_progress(n_ticks=350):
         X_pos = to_df(Xall[:, [cols.index(col) for col in type_cols]], type_cols)[pos_mask]
         y_pos_lbl = labels_all[pos_mask]
         classes = np.array(["Breach", "Jamming", "Spoof", "Tamper"])
+        observed_labels = sorted(set(y_pos_lbl.tolist()))
+        missing_labels = [label for label in classes.tolist() if label not in observed_labels]
+        st.session_state.training_info["type_classes_observed"] = observed_labels
+        st.session_state.training_info["type_classes_missing"] = missing_labels
+        if missing_labels:
+            log_train(
+                "Attack type training note: missing classes in current synthetic sample -> "
+                + ", ".join(missing_labels)
+                + ". The multiclass model will train on observed classes only; rule fusion still covers all four output types."
+            )
         y_idx = np.array([np.where(classes == label)[0][0] for label in y_pos_lbl])
         cls, cnt = np.unique(y_idx, return_counts=True)
         weight_map = {cls_idx: (1.0 / count) for cls_idx, count in zip(cls, cnt)}
@@ -363,6 +383,8 @@ def train_model_with_progress(n_ticks=350):
             "accuracy_raw": acc_raw,
             "accuracy_calibrated": acc_adj,
             "classes": list(classes),
+            "classes_observed": observed_labels,
+            "classes_missing": missing_labels,
             "tau": TYPE_TAU,
             "delta": TYPE_DELTA,
             "alpha": TYPE_ALPHA,
@@ -374,6 +396,8 @@ def train_model_with_progress(n_ticks=350):
         st.session_state.type_labels = []
         st.session_state.type_explainer = None
         st.session_state.type_metrics = {}
+        st.session_state.training_info["type_classes_observed"] = []
+        st.session_state.training_info["type_classes_missing"] = list(classes) if 'classes' in locals() else ["Breach", "Jamming", "Spoof", "Tamper"]
 
     st.session_state.model = model
     st.session_state.scaler = scaler

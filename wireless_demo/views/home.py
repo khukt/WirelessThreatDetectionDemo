@@ -67,6 +67,24 @@ ROLE_BUTTONS = [
     ("📊", "Executive", "Leadership summary"),
 ]
 
+PROJECT_SUMMARY_CARDS = [
+    (
+        "Project value",
+        "Trustworthy wireless AI",
+        "Demonstrates how anomaly detection, threat typing, and human oversight can be combined into a project-ready story for smart industry and 6G-adjacent operations.",
+    ),
+    (
+        "What visitors get",
+        "Guided, role-aware journey",
+        "Each audience sees the same system through a tailored explanation layer, making the demo friendlier for research showcases, stakeholder meetings, and classroom walkthroughs.",
+    ),
+    (
+        "Best starting point",
+        "Pick a scenario, then a role",
+        "The Home page now acts like a project hub: it explains purpose first, then helps visitors jump into Overview, Incidents, Insights, or Governance with the right context.",
+    ),
+]
+
 
 def _render_card(icon, title, copy, chip=None):
     chip_html = f"<div class='home-chip'>{chip}</div>" if chip else ""
@@ -98,6 +116,49 @@ def _render_icon_tile(icon, title, copy, caption=None):
     )
 
 
+def _render_project_banner(role, scenario, profile):
+    scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
+    model_ready = st.session_state.get("model") is not None
+    model_source = st.session_state.get("model_artifact_source") or ("Setup required" if not model_ready else "Current session")
+    st.markdown(
+        f"""
+        <div class="home-project-shell">
+            <div class="home-project-kicker">Project-friendly landing page</div>
+            <div class="home-project-title">TRUST AI — Wireless Threat Detection Demo Hub</div>
+            <div class="home-project-copy">
+                A project showcase for trustworthy wireless threat detection in smart industry settings. Use this landing page
+                to explain the purpose of the demo, align the audience to the right role, and move quickly from project overview
+                to live posture, incident triage, model transparency, and governance evidence.
+            </div>
+            <div class="home-project-chip-row">
+                <span class="home-project-chip">Profile: {profile}</span>
+                <span class="home-project-chip">Scenario: {scenario}</span>
+                <span class="home-project-chip">Audience: {role}</span>
+                <span class="home-project-chip">Model: {model_source}</span>
+                <span class="home-project-chip">Watch for: {scenario_copy['signals']}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_project_summary_grid():
+    columns = st.columns(len(PROJECT_SUMMARY_CARDS))
+    for column, (kicker, title, copy) in zip(columns, PROJECT_SUMMARY_CARDS):
+        with column:
+            st.markdown(
+                f"""
+                <div class="home-mini-card">
+                    <div class="home-mini-kicker">{kicker}</div>
+                    <div class="home-mini-title">{title}</div>
+                    <div class="home-mini-copy">{copy}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
 def _section_container(title, compact_mode, expanded=False):
     if compact_mode:
         return st.expander(title, expanded=expanded)
@@ -108,6 +169,8 @@ def _section_container(title, compact_mode, expanded=False):
 def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     render_header(profile, scenario, role)
     render_quickstart(help_mode, show_eu_status, scenario)
+    _render_project_banner(role, scenario, profile)
+    _render_project_summary_grid()
     render_demo_storyline(
         model_ready=st.session_state.get("model") is not None,
         incident_count=len(st.session_state.get("incidents", [])),
@@ -128,7 +191,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
 
     render_section_card(
         "Demo snapshot",
-        "These high-level metrics help the audience quickly understand scale, current alert load, model quality, and how recently the demo was refreshed.",
+        "These high-level metrics help visitors quickly understand project scale, current alert load, model quality, and how recently the demo was refreshed.",
         kicker="At a glance",
     )
     with st.container(border=True):
@@ -185,7 +248,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     with _section_container("About this demo", compact_mode, expanded=True):
         render_section_card(
             "About this demo",
-            "Use this summary to explain the end-to-end story: telemetry comes in, AI highlights suspicious behavior, attack typing adds meaning, and humans stay in control of the final decision.",
+            "Use this summary to explain the end-to-end project story: telemetry comes in, AI highlights suspicious behavior, attack typing adds meaning, and humans stay in control of the final decision.",
             kicker="Storyline",
         )
         top_left, top_right = st.columns([1.15, 0.85])
@@ -195,7 +258,8 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
                     "- Watches simulated wireless and logistics telemetry across a fleet.  \n"
                     "- Detects suspicious behavior with an anomaly model.  \n"
                     "- Explains the likely threat type with model output plus domain rules.  \n"
-                    "- Keeps a human reviewer in the loop for approve, dismiss, or escalate decisions."
+                    "- Keeps a human reviewer in the loop for approve, dismiss, or escalate decisions.  \n"
+                    "- Packages the workflow into a role-aware project demo for operations, research, and assurance audiences."
                 )
         with top_right:
             _render_card("📍", scenario, scenario_copy["summary"], chip=f"Watch for: {scenario_copy['signals']}")
