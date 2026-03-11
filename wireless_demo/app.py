@@ -564,6 +564,10 @@ def main():
                 1,
                 key="hitl_suppression_ticks",
             )
+            render_sidebar_hint(
+                "Suppression window",
+                "How long a device stays deprioritized after a reviewer marks a recent alert as a false positive. `0` means no suppression window.",
+            )
             st.slider(
                 "Escalation queue boost",
                 0.0,
@@ -571,6 +575,10 @@ def main():
                 float(st.session_state.get("hitl_escalation_boost", CFG.hitl_escalation_boost)),
                 0.05,
                 key="hitl_escalation_boost",
+            )
+            render_sidebar_hint(
+                "Escalation boost",
+                "Extra priority added to escalated incidents so they rise higher in the queue. Higher values push reviewed high-risk items to the front faster.",
             )
             render_sidebar_hint("Policy effect", "These controls change how prior human reviews influence duplicate suppression and triage ordering.")
 
