@@ -1080,85 +1080,48 @@ def render_sidebar_summary_card(profile: str, scenario: str, role: str):
 
 
 def render_funding_acknowledgement():
-        vinnova_logo_bytes: Optional[bytes] = None
-        try:
-                vinnova_logo_bytes = fetch_logo_bytes(VINNOVA_LOGO_URL)
-        except Exception:
-                vinnova_logo_bytes = None
+    vinnova_logo_bytes: Optional[bytes] = None
+    try:
+        vinnova_logo_bytes = fetch_logo_bytes(VINNOVA_LOGO_URL)
+    except Exception:
+        vinnova_logo_bytes = None
 
-        kks_logo_bytes: Optional[bytes] = None
-        try:
-                kks_logo_bytes = fetch_logo_bytes(KKS_LOGO_URL)
-        except Exception:
-                kks_logo_bytes = None
+    kks_logo_bytes: Optional[bytes] = None
+    try:
+        kks_logo_bytes = fetch_logo_bytes(KKS_LOGO_URL)
+    except Exception:
+        kks_logo_bytes = None
 
-        aurora_logo_bytes: Optional[bytes] = None
-        try:
-                aurora_logo_bytes = fetch_logo_bytes(AURORA_LOGO_URL)
-        except Exception:
-                aurora_logo_bytes = None
+    aurora_logo_bytes: Optional[bytes] = None
+    try:
+        aurora_logo_bytes = fetch_logo_bytes(AURORA_LOGO_URL)
+    except Exception:
+        aurora_logo_bytes = None
 
-        vinnova_logo_src = logo_src(VINNOVA_LOGO_URL, vinnova_logo_bytes)
-        kks_logo_src = logo_src(KKS_LOGO_URL, kks_logo_bytes)
-        aurora_logo_src = logo_src(AURORA_LOGO_URL, aurora_logo_bytes)
+    st.markdown("### Funding acknowledgement")
+    st.markdown(
+        f"This demo hub is supported by **VINNOVA** (Sweden's Innovation Agency), "
+        f"project reference **{PROJECT_REF}**, by **KK-stiftelsen** (The Knowledge Foundation), "
+        f"and by **Interreg Aurora**."
+    )
 
-        st.markdown(
-                f"""
-                <div class="fundingWrap">
-                    <div class="fundingTitle">Funding acknowledgement</div>
-                    <div class="fundingText">
-                        This demo hub is supported by <b>VINNOVA</b> (Sweden's Innovation Agency),
-                        Project reference: <b>{PROJECT_REF}</b>, by <b>KK-stiftelsen</b> (The Knowledge Foundation),
-                        and by <b>Interreg Aurora</b>.
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
-        st.markdown(
-                f"""
-                <div class="fundingGrid">
-                    <div class="fundingItem">
-                        <div class="fundingLogoSlot">
-                            <img class="fundingLogo vinnova" src="{vinnova_logo_src}" alt="VINNOVA logo" />
-                        </div>
-                        <div class="fundingText fundingLink" style="margin-top:8px;">
-                            <a href="{PROJECT_URL}" target="_blank">View VINNOVA project page →</a>
-                        </div>
-                    </div>
+    funding_items = [
+        ("VINNOVA", vinnova_logo_bytes or VINNOVA_LOGO_URL, PROJECT_URL, "View VINNOVA project page"),
+        ("KK-stiftelsen", kks_logo_bytes or KKS_LOGO_URL, KKS_URL, "View KKS website"),
+        ("Interreg Aurora", aurora_logo_bytes or AURORA_LOGO_URL, AURORA_URL, "View Interreg Aurora project"),
+    ]
 
-                    <div class="fundingItem">
-                        <div class="fundingLogoSlot">
-                            <img class="fundingLogo kks" src="{kks_logo_src}" alt="KKS logo" />
-                        </div>
-                        <div class="fundingText fundingLink" style="margin-top:8px;">
-                            <a href="{KKS_URL}" target="_blank">View KKS website →</a>
-                        </div>
-                    </div>
-
-                    <div class="fundingItem">
-                        <div class="fundingLogoSlot">
-                            <img class="fundingLogo aurora" src="{aurora_logo_src}" alt="Interreg Aurora logo" />
-                        </div>
-                        <div class="fundingText fundingLink" style="margin-top:8px;">
-                            <a href="{AURORA_URL}" target="_blank">View Interreg Aurora project →</a>
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
+    columns = st.columns(3)
+    for column, (label, image_source, link_url, button_text) in zip(columns, funding_items):
+        with column:
+            with st.container(border=True):
+                st.image(image_source)
+                st.link_button(button_text, link_url, use_container_width=True)
+                st.caption(label)
 
 
 def render_footerline():
-        st.markdown(
-                """
-                <div class="footerline">
-                    Trustworthy AI Demo Hub — Developed and maintained by Kyi Thar • Contact: kyi.thar@miun.se
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
+    st.caption("Trustworthy AI Demo Hub — Developed and maintained by Kyi Thar • Contact: kyi.thar@miun.se")
 
 
 def render_scenario_context(scenario: str):

@@ -23,7 +23,6 @@ from .helpers import (
     time_of_day_load,
     to_df,
 )
-from .hitl import get_device_review_effect
 
 
 def update_positions(df):
@@ -644,6 +643,8 @@ def tick_once(scenario, use_conformal):
                     "type_classes": list(st.session_state.get("type_labels", ["Breach", "Jamming", "Spoof", "Tamper"])),
                     "type_margin": float(margin) if margin is not None else None,
                 }
+
+                from .hitl import get_device_review_effect
 
                 review_effect = get_device_review_effect(device_id, scenario, tick)
                 incident["review_status"] = review_effect["status"]
