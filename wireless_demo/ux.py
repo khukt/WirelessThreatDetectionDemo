@@ -1494,20 +1494,37 @@ def icon_badge_html(name: str, size: str = "md") -> str:
 
 
 def render_disclaimer_banner():
-    st.markdown(
-        """
-        <div class="app-disclaimer">
-            <div class="app-disclaimer-icon">"""
-        + icon_badge_html("notice", "sm")
-        + """</div>
-            <div>
-                <div class="app-disclaimer-title">Educational demo only</div>
-                <div class="app-disclaimer-copy">This app is for demonstration, learning, and research. It is not intended for production, commercial, safety, or operational deployment.</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if not st.session_state.get("disclaimer_collapsed", False):
+        banner_cols = st.columns([8, 1.2])
+        with banner_cols[0]:
+            st.markdown(
+                """
+                <div class="app-disclaimer">
+                    <div class="app-disclaimer-icon">"""
+                + icon_badge_html("notice", "sm")
+                + """</div>
+                    <div>
+                        <div class="app-disclaimer-title">Educational demo only</div>
+                        <div class="app-disclaimer-copy">This app is for demonstration, learning, and research. It is not intended for production, commercial, safety, or operational deployment.</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with banner_cols[1]:
+            st.write("")
+            if st.button("Hide", key="collapse_disclaimer_banner", use_container_width=True):
+                st.session_state.disclaimer_collapsed = True
+                st.rerun()
+    else:
+        compact_cols = st.columns([8, 1.2])
+        with compact_cols[0]:
+            st.caption("Educational demo only · Not intended for production, commercial, safety, or operational deployment.")
+        with compact_cols[1]:
+            if st.button("Show", key="expand_disclaimer_banner", use_container_width=True):
+                st.session_state.disclaimer_collapsed = False
+                st.rerun()
+
     with st.expander("See full disclaimer", expanded=False):
         st.markdown(
             "This demo is provided as a proof-of-concept experience only. All content, data, and examples are intended for learning and research. "

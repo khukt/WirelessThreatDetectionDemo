@@ -1,4 +1,6 @@
 import warnings
+from typing import Optional
+
 import streamlit as st
 
 from .config import CFG, DEVICE_TYPES, MODEL_KEY
@@ -27,6 +29,17 @@ from .views.insights import render_insights_tab
 from .views.overview import render_overview_tab
 
 
+ONBOARDING_SCENARIOS = [
+    "Normal",
+    "Jamming (localized)",
+    "Access Breach (AP/gNB)",
+    "GPS Spoofing (subset)",
+    "Data Tamper (gateway)",
+]
+
+ONBOARDING_ROLES = ["End User", "Domain Expert", "Regulator", "AI Builder", "Executive"]
+
+
 def _apply_pending_home_actions():
     pending_scenario = st.session_state.pop("pending_home_scenario", None)
     if pending_scenario is not None:
@@ -37,27 +50,130 @@ def _apply_pending_home_actions():
         st.session_state.role_selector_preview = pending_role
 
 
+def _apply_onboarding_choices():
+    selected_scenario = st.session_state.get("onboarding_scenario")
+    selected_role = st.session_state.get("onboarding_role")
+    if selected_scenario:
+        st.session_state.scenario_selector = selected_scenario
+    if selected_role:
+        st.session_state.role_selector_preview = selected_role
+
+
+def _close_onboarding(open_tab: Optional[str] = None, open_setup: bool = False):
+    _apply_onboarding_choices()
+    st.session_state.welcome_prompt_dismissed = True
+    st.session_state.onboarding_step = 1
+    if open_tab is not None:
+        st.session_state.active_primary_tab = open_tab
+    if open_setup:
+        st.session_state.open_training_dialog = True
+
+
+def _restart_onboarding():
+    st.session_state.onboarding_step = 1
+    st.session_state.onboarding_scenario = st.session_state.get("scenario_selector", "Normal")
+    st.session_state.onboarding_role = st.session_state.get("role_selector_preview", "AI Builder")
+    st.session_state.welcome_prompt_dismissed = False
+
+
 @st.dialog("Welcome to the demo")
 def _render_first_open_welcome_dialog():
+    step = st.session_state.get("onboarding_step", 1)
+    st.session_state.setdefault("onboarding_scenario", st.session_state.get("scenario_selector", "Normal"))
+    st.session_state.setdefault("onboarding_role", st.session_state.get("role_selector_preview", "AI Builder"))
+
+    if step == 1:
+        render_onboarding_panel(
+            title="What this demo is",
+            body="This demo shows how AI flags suspicious wireless behavior, suggests a likely threat type, and keeps a human reviewer in control of the final decision.",
+            bullets=[
+                "Designed for presentations, research demos, teaching, and stakeholder briefings.",
+                "Combines live monitoring, incident triage, transparency, and governance in one flow.",
+                "A simple path is: Home overview first, then the live tabs when you are ready.",
+            ],
+            kicker="Welcome",
+            variant="info",
+        )
+        cols = st.columns([1, 1])
+        if cols[0].button("Start on Home", key="onboarding_skip_step1", use_container_width=True):
+            _close_onboarding(open_tab="Home")
+            st.rerun()
+        if cols[1].button("Set my context", key="onboarding_next_step1", use_container_width=True):
+            st.session_state.onboarding_step = 2
+            st.rerun()
+        return
+
+    if step == 2:
+        render_onboarding_panel(
+            title="Choose your context",
+            body="Choose the scenario and audience view before you start. This changes how the demo story is framed without changing the underlying system behavior.",
+            bullets=[
+                "Scenario changes the threat story being demonstrated.",
+                "Audience view changes the explanation style, not the underlying system behavior.",
+            ],
+            kicker="Step 2",
+            variant="info",
+        )
+        select_cols = st.columns(2)
+        select_cols[0].selectbox("Scenario", ONBOARDING_SCENARIOS, key="onboarding_scenario")
+        select_cols[1].selectbox("Audience view", ONBOARDING_ROLES, key="onboarding_role")
+        cols = st.columns([1, 1, 1])
+        if cols[0].button("Back", key="onboarding_back_step2", use_container_width=True):
+            st.session_state.onboarding_step = 1
+            st.rerun()
+        if cols[1].button("Use defaults", key="onboarding_defaults_step2", use_container_width=True):
+            st.session_state.onboarding_scenario = "Normal"
+            st.session_state.onboarding_role = "AI Builder"
+            st.rerun()
+        if cols[2].button("See the workflow", key="onboarding_next_step2", use_container_width=True):
+            st.session_state.onboarding_step = 3
+            st.rerun()
+        return
+
+    if step == 3:
+        render_onboarding_panel(
+            title="How the demo works",
+            body="The workflow is intentionally simple for first-time users.",
+            bullets=[
+                "Detect anomaly: a LightGBM model scores suspicious behavior from rolling telemetry features.",
+                "Explain likely threat: a second stage combines multiclass prediction with domain rules.",
+                "Send to review: humans approve, dismiss, or escalate alerts with auditability.",
+            ],
+            kicker="Step 3",
+            variant="info",
+        )
+        cols = st.columns([1, 1])
+        if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True):
+            st.session_state.onboarding_step = 2
+            st.rerun()
+        if cols[1].button("Choose a starting view", key="onboarding_next_step3", use_container_width=True):
+            st.session_state.onboarding_step = 4
+            st.rerun()
+        return
+
     render_onboarding_panel(
-        title="Start here",
-        body="Use the Home page first to understand the story of the demo before opening the detailed workspaces.",
+        title="Where to go next",
+        body="Pick the best starting point for your session.",
         bullets=[
-            "Home explains what the demo is, which models it uses, and what is included.",
-            "Overview shows live wireless posture and fleet risk.",
-            "Incidents supports alert triage and human review actions.",
-            "Insights and Governance explain model behavior and trust controls.",
+            "Home gives the presentation overview.",
+            "Overview shows live monitoring and fleet risk.",
+            "Incidents, Insights, and Governance provide deeper operational and assurance views.",
         ],
-        kicker="Getting started",
+        kicker="Step 4",
         variant="info",
     )
-    cols = st.columns(2)
-    if cols[0].button("Got it", key="welcome_dismiss", use_container_width=True):
-        st.session_state.welcome_prompt_dismissed = True
+    cols = st.columns([1, 1, 1, 1])
+    if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True):
+        st.session_state.onboarding_step = 3
         st.rerun()
-    if cols[1].button("Open model setup guide", key="welcome_open_setup", use_container_width=True):
-        st.session_state.welcome_prompt_dismissed = True
-        st.session_state.training_prompt_dismissed = False
+    if cols[1].button("Home overview", key="onboarding_open_home", use_container_width=True):
+        _close_onboarding(open_tab="Home")
+        st.rerun()
+    if cols[2].button("Live monitoring", key="onboarding_open_overview", use_container_width=True):
+        _close_onboarding(open_tab="Overview")
+        st.rerun()
+    if cols[3].button("Model setup guide", key="onboarding_open_setup", use_container_width=True):
+        _close_onboarding(open_tab="Home", open_setup=True)
         st.rerun()
 
 
@@ -80,11 +196,11 @@ def _render_initial_training_prompt_dialog():
     )
     action_cols = st.columns(2)
     if action_cols[0].button("Start model setup", key="initial_train_now", use_container_width=True):
-        st.session_state.training_prompt_dismissed = True
+        st.session_state.open_training_dialog = False
         train_model_with_progress(n_ticks=350)
         st.rerun()
     if action_cols[1].button("Skip for now", key="initial_train_later", use_container_width=True):
-        st.session_state.training_prompt_dismissed = True
+        st.session_state.open_training_dialog = False
         st.rerun()
 
 
@@ -291,8 +407,11 @@ def main():
             help_mode = st.checkbox("Help mode (inline hints)", True)
             show_eu_status = st.checkbox("Show EU AI Act status banner", True)
             render_sidebar_hint("When to use this", sidebar_copy["guidance"])
+            if st.button("Restart guided onboarding", use_container_width=True, type="secondary"):
+                _restart_onboarding()
+                st.rerun()
             if st.button("Open model setup guide", use_container_width=True):
-                st.session_state.training_prompt_dismissed = False
+                st.session_state.open_training_dialog = True
                 st.rerun()
 
     if "devices" not in st.session_state or reset:
@@ -336,22 +455,29 @@ def main():
         trained_at = artifacts.get("trained_at")
         trained_note = f" (saved at {trained_at})" if trained_at else ""
         title = "Bundled startup cache loaded" if artifact_source == "Bundled startup cache" else "Cached model loaded"
-        render_status_strip(
-            title=title,
-            body=f"Loaded cached model{trained_note}. No setup refresh is needed unless you want to rebuild the models from scratch.",
-            icon="cache" if artifact_source == "Bundled startup cache" else "ready",
-        )
-        st.session_state.training_prompt_dismissed = False
+        if not st.session_state.get("startup_cache_notice_dismissed", False):
+            notice_cols = st.columns([8, 1.2])
+            with notice_cols[0]:
+                render_status_strip(
+                    title=title,
+                    body=f"Loaded cached model{trained_note}. No setup refresh is needed unless you want to rebuild the models from scratch.",
+                    icon="cache" if artifact_source == "Bundled startup cache" else "ready",
+                )
+            with notice_cols[1]:
+                st.write("")
+                if st.button("Hide", key="dismiss_startup_cache_notice", use_container_width=True):
+                    st.session_state.startup_cache_notice_dismissed = True
+                    st.rerun()
+        else:
+            st.caption(
+                f"{title} · Loaded cached model{trained_note}. Use model setup only if you want to rebuild from scratch."
+            )
 
     if retrain or (CFG.retrain_on_start and st.session_state.get("model") is None and MODEL_KEY not in store):
-        st.session_state.training_prompt_dismissed = True
+        st.session_state.open_training_dialog = False
         train_model_with_progress(n_ticks=350)
 
-    if (
-        st.session_state.get("model") is None
-        and not st.session_state.get("training_prompt_dismissed", False)
-        and st.session_state.get("welcome_prompt_dismissed", False)
-    ):
+    if st.session_state.get("open_training_dialog", False):
         _render_initial_training_prompt()
 
     _render_live_workflow(

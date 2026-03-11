@@ -257,6 +257,24 @@ def _render_workflow_overview():
         _render_card("step_3", "Send to review", "Human reviewers approve, dismiss, or escalate the alert with traceable oversight.")
 
 
+def _render_restart_onboarding_callout():
+    callout_cols = st.columns([3.2, 1])
+    with callout_cols[0]:
+        st.caption("Need the guided intro again? Restart guided onboarding for the next audience using the current scenario and role as defaults.")
+    with callout_cols[1]:
+        if st.button(
+            "Restart guided onboarding",
+            key="home_restart_onboarding",
+            use_container_width=True,
+            type="secondary",
+        ):
+            st.session_state.onboarding_step = 1
+            st.session_state.onboarding_scenario = st.session_state.get("scenario_selector", "Normal")
+            st.session_state.onboarding_role = st.session_state.get("role_selector_preview", "AI Builder")
+            st.session_state.welcome_prompt_dismissed = False
+            st.rerun()
+
+
 def _render_explore_destinations():
     render_section_card(
         "Where to explore next",
@@ -320,6 +338,7 @@ def _render_home_snapshot():
 def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     _render_project_banner(role, scenario, profile)
     _render_presentation_overview(role, scenario, profile)
+    _render_restart_onboarding_callout()
     _render_workflow_overview()
     _render_explore_destinations()
     _render_customize_walkthrough(role, scenario)
@@ -336,7 +355,6 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         setup_cols = st.columns([1, 2])
         with setup_cols[0]:
             if st.button("Run model setup", key="home_train_model", use_container_width=True):
-                st.session_state.training_prompt_dismissed = True
                 train_model_with_progress(n_ticks=350)
                 st.session_state.home_message = "Model setup completed. You can now use the live monitoring tabs."
                 st.rerun()

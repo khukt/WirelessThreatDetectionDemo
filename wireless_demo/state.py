@@ -88,7 +88,6 @@ def init_state():
     st.session_state.review_log = load_review_log()
     sync_legacy_labels(st.session_state.review_log)
     st.session_state.hitl_live_stats = {"suppressed_alerts": 0, "prioritized_alerts": 0, "last_effect": None}
-    st.session_state.training_prompt_dismissed = False
     st.session_state.suggested_threshold = None
     st.session_state.seq_counter = {
         row.device_id: 0 for _, row in st.session_state.devices.iterrows()

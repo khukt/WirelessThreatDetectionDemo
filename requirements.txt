@@ -1,5 +1,6 @@
 streamlit
 requests
+urllib3<2
 pandas
 numpy
 scikit-learn
