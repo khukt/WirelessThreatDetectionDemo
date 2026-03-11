@@ -488,29 +488,33 @@ def inject_global_styles():
             font-size: 0.88rem;
             line-height: 1.55;
         }
-        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"],
-        div[role="dialog"][aria-label="Welcome to the demo"] {
-            width: min(98vw, 1560px) !important;
-            max-width: 98vw !important;
-            margin: 1vh auto !important;
+        .onboarding-fullscreen-shell {
+            padding: 0.35rem 0 0.2rem 0;
+            margin: 0 auto 0.25rem auto;
         }
-        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"] > div,
-        div[role="dialog"][aria-label="Welcome to the demo"] > div {
-            max-height: 96vh !important;
-            min-height: 96vh !important;
-            overflow-y: auto !important;
-            padding: 1rem 1.25rem 1.3rem 1.25rem !important;
+        .onboarding-fullscreen-kicker {
+            display: inline-block;
+            padding: 0.18rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+            font-size: 0.76rem;
+            font-weight: 700;
+            margin-bottom: 0.55rem;
         }
-        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"] h1,
-        div[role="dialog"][aria-label="Welcome to the demo"] h1 {
-            font-size: 1.35rem !important;
+        .onboarding-fullscreen-title {
+            font-size: 2rem;
+            line-height: 1.15;
+            font-weight: 800;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.3rem;
         }
-        @media (min-width: 900px) {
-            div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"],
-            div[role="dialog"][aria-label="Welcome to the demo"] {
-                width: min(98vw, 1640px) !important;
-                max-width: 98vw !important;
-            }
+        .onboarding-fullscreen-copy {
+            font-size: 1rem;
+            line-height: 1.55;
+            color: rgba(51, 65, 85, 0.82);
+            max-width: 980px;
+            margin-bottom: 0.5rem;
         }
         .onboarding-progress-note {
             display: flex;

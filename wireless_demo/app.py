@@ -104,193 +104,204 @@ def _render_onboarding_action_hint(message: str):
     st.markdown(f"<div class='onboarding-actions-note'>{message}</div>", unsafe_allow_html=True)
 
 
-@st.dialog("Welcome to the demo")
-def _render_first_open_welcome_dialog():
+def _render_first_open_welcome():
     step = st.session_state.get("onboarding_step", 1)
     st.session_state.setdefault("onboarding_scenario", st.session_state.get("scenario_selector", "Normal"))
     st.session_state.setdefault("onboarding_role", st.session_state.get("role_selector_preview", "AI Builder"))
-    _render_onboarding_progress(step)
 
-    if step == 1:
+    st.markdown(
+        """
+        <div class="onboarding-fullscreen-shell">
+            <div class="onboarding-fullscreen-kicker">Guided onboarding</div>
+            <div class="onboarding-fullscreen-title">Welcome to the demo</div>
+            <div class="onboarding-fullscreen-copy">
+                Start here if this is your first time. This walkthrough explains the demo one step at a time and then sends you to the best place to begin.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    outer_cols = st.columns([0.55, 4.9, 0.55])
+    with outer_cols[1]:
+        _render_onboarding_progress(step)
+
+        if step == 1:
+            render_onboarding_panel(
+                title="What this demo is",
+                body="This demo shows how AI flags suspicious wireless behavior, suggests a likely threat type, and keeps a human reviewer in control of the final decision.",
+                bullets=[
+                    "Designed for presentations, research demos, teaching, and stakeholder briefings.",
+                    "Combines live monitoring, incident triage, transparency, and governance in one flow.",
+                    "A simple path is: Home overview first, then the live tabs when you are ready.",
+                ],
+                kicker="Welcome",
+                variant="info",
+            )
+            _render_onboarding_action_hint("First time here? Click the blue button: Continue guided onboarding. Skip only if you already know the demo.")
+            cols = st.columns([1, 1.9])
+            if cols[0].button("Skip intro", key="onboarding_skip_step1", use_container_width=True, type="secondary"):
+                _close_onboarding(open_tab="Home")
+                st.rerun()
+            if cols[1].button("Continue guided onboarding", key="onboarding_next_step1", use_container_width=True, type="primary"):
+                st.session_state.onboarding_step = 2
+                st.rerun()
+            return
+
+        if step == 2:
+            render_onboarding_panel(
+                title="Choose your context",
+                body="Choose the scenario and audience view before you start. This changes how the demo story is framed without changing the underlying system behavior.",
+                bullets=[
+                    "Scenario changes the threat story being demonstrated.",
+                    "Audience view changes the explanation style, not the underlying system behavior.",
+                ],
+                kicker="Step 2",
+                variant="info",
+            )
+            select_cols = st.columns(2)
+            select_cols[0].selectbox("Scenario", ONBOARDING_SCENARIOS, key="onboarding_scenario")
+            select_cols[1].selectbox("Audience view", ONBOARDING_ROLES, key="onboarding_role")
+            _render_onboarding_action_hint("Recommended defaults are already selected. Change them only if you want to tell a different story.")
+            cols = st.columns([1, 1.2, 1.7])
+            if cols[0].button("Back", key="onboarding_back_step2", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 1
+                st.rerun()
+            if cols[1].button("Use recommended defaults", key="onboarding_defaults_step2", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_scenario = "Normal"
+                st.session_state.onboarding_role = "AI Builder"
+                st.rerun()
+            if cols[2].button("Next: see the model story", key="onboarding_next_step2", use_container_width=True, type="primary"):
+                st.session_state.onboarding_step = 3
+                st.rerun()
+            return
+
+        if step == 3:
+            render_onboarding_panel(
+                title="What models are used",
+                body="The demo uses a staged AI workflow rather than a single black-box score.",
+                bullets=[
+                    "Stage 1: a LightGBM anomaly detector scores suspicious behavior from rolling telemetry features.",
+                    "Stage 2: threat typing combines multiclass prediction with domain rules for Jamming, Breach, Spoofing, and Tamper.",
+                    "Confidence controls and human review keep the final outcome explainable and accountable.",
+                ],
+                kicker="Step 3",
+                variant="info",
+            )
+            _render_onboarding_action_hint("Continue to see which parts of the demo are included in the walkthrough.")
+            cols = st.columns([1, 1])
+            if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 2
+                st.rerun()
+            if cols[1].button("Next: what is included", key="onboarding_next_step3", use_container_width=True, type="primary"):
+                st.session_state.onboarding_step = 4
+                st.rerun()
+            return
+
+        if step == 4:
+            render_onboarding_panel(
+                title="What is included",
+                body="The app is designed to tell both the operational story and the trust story from one place.",
+                bullets=[
+                    "Live monitoring for posture, risk, map context, and fleet behavior.",
+                    "Incident triage for evidence review, approval, dismissal, or escalation.",
+                    "Transparency and governance views for calibration, feature importance, auditability, and oversight framing.",
+                ],
+                kicker="Step 4",
+                variant="info",
+            )
+            _render_onboarding_action_hint("Continue to see the simple operator workflow used throughout the demo.")
+            cols = st.columns([1, 1])
+            if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 3
+                st.rerun()
+            if cols[1].button("Next: see the workflow", key="onboarding_next_step4", use_container_width=True, type="primary"):
+                st.session_state.onboarding_step = 5
+                st.rerun()
+            return
+
+        if step == 5:
+            render_onboarding_panel(
+                title="How the demo works",
+                body="The walkthrough is intentionally simple for first-time users.",
+                bullets=[
+                    "Detect anomaly from recent telemetry.",
+                    "Explain the likely threat family with model output plus rules.",
+                    "Send the alert to human review with traceable oversight.",
+                ],
+                kicker="Step 5",
+                variant="info",
+            )
+            _render_onboarding_action_hint("One more step: choose where to begin the live demo.")
+            cols = st.columns([1, 1])
+            if cols[0].button("Back", key="onboarding_back_step5", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 4
+                st.rerun()
+            if cols[1].button("Next: choose a starting view", key="onboarding_next_step5", use_container_width=True, type="primary"):
+                st.session_state.onboarding_step = 6
+                st.rerun()
+            return
+
         render_onboarding_panel(
-            title="What this demo is",
-            body="This demo shows how AI flags suspicious wireless behavior, suggests a likely threat type, and keeps a human reviewer in control of the final decision.",
+            title="Where to go next",
+            body="Pick the best starting point for your session.",
             bullets=[
-                "Designed for presentations, research demos, teaching, and stakeholder briefings.",
-                "Combines live monitoring, incident triage, transparency, and governance in one flow.",
-                "A simple path is: Home overview first, then the live tabs when you are ready.",
+                "Home gives the lightweight presentation overview and lets you adjust the audience and scenario.",
+                "Overview shows live monitoring and fleet risk.",
+                "Incidents, Insights, and Governance provide deeper operational and assurance views.",
             ],
-            kicker="Welcome",
+            kicker="Step 6",
             variant="info",
         )
-        _render_onboarding_action_hint("First time here? Click the blue button: Continue guided onboarding. Skip only if you already know the demo.")
-        cols = st.columns([1, 1.7])
-        if cols[0].button("Skip intro", key="onboarding_skip_step1", use_container_width=True, type="secondary"):
-            _close_onboarding(open_tab="Home")
-            st.rerun()
-        if cols[1].button("Continue guided onboarding", key="onboarding_next_step1", use_container_width=True, type="primary"):
-            st.session_state.onboarding_step = 2
-            st.rerun()
-        return
-
-    if step == 2:
-        render_onboarding_panel(
-            title="Choose your context",
-            body="Choose the scenario and audience view before you start. This changes how the demo story is framed without changing the underlying system behavior.",
-            bullets=[
-                "Scenario changes the threat story being demonstrated.",
-                "Audience view changes the explanation style, not the underlying system behavior.",
-            ],
-            kicker="Step 2",
-            variant="info",
-        )
-        select_cols = st.columns(2)
-        select_cols[0].selectbox("Scenario", ONBOARDING_SCENARIOS, key="onboarding_scenario")
-        select_cols[1].selectbox("Audience view", ONBOARDING_ROLES, key="onboarding_role")
-        _render_onboarding_action_hint("Recommended defaults are already selected. Change them only if you want to tell a different story.")
-        cols = st.columns([1, 1.2, 1.7])
-        if cols[0].button("Back", key="onboarding_back_step2", use_container_width=True, type="secondary"):
-            st.session_state.onboarding_step = 1
-            st.rerun()
-        if cols[1].button("Use recommended defaults", key="onboarding_defaults_step2", use_container_width=True, type="secondary"):
-            st.session_state.onboarding_scenario = "Normal"
-            st.session_state.onboarding_role = "AI Builder"
-            st.rerun()
-        if cols[2].button("Next: see the model story", key="onboarding_next_step2", use_container_width=True, type="primary"):
-            st.session_state.onboarding_step = 3
-            st.rerun()
-        return
-
-    if step == 3:
-        render_onboarding_panel(
-            title="What models are used",
-            body="The demo uses a staged AI workflow rather than a single black-box score.",
-            bullets=[
-                "Stage 1: a LightGBM anomaly detector scores suspicious behavior from rolling telemetry features.",
-                "Stage 2: threat typing combines multiclass prediction with domain rules for Jamming, Breach, Spoofing, and Tamper.",
-                "Confidence controls and human review keep the final outcome explainable and accountable.",
-            ],
-            kicker="Step 3",
-            variant="info",
-        )
-        _render_onboarding_action_hint("Continue to see which parts of the demo are included in the walkthrough.")
-        cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True, type="secondary"):
-            st.session_state.onboarding_step = 2
-            st.rerun()
-        if cols[1].button("Next: what is included", key="onboarding_next_step3", use_container_width=True, type="primary"):
-            st.session_state.onboarding_step = 4
-            st.rerun()
-        return
-
-    if step == 4:
-        render_onboarding_panel(
-            title="What is included",
-            body="The app is designed to tell both the operational story and the trust story from one place.",
-            bullets=[
-                "Live monitoring for posture, risk, map context, and fleet behavior.",
-                "Incident triage for evidence review, approval, dismissal, or escalation.",
-                "Transparency and governance views for calibration, feature importance, auditability, and oversight framing.",
-            ],
-            kicker="Step 4",
-            variant="info",
-        )
-        _render_onboarding_action_hint("Continue to see the simple operator workflow used throughout the demo.")
-        cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True, type="secondary"):
-            st.session_state.onboarding_step = 3
-            st.rerun()
-        if cols[1].button("Next: see the workflow", key="onboarding_next_step4", use_container_width=True, type="primary"):
+        _render_onboarding_action_hint("Recommended first stop: Home overview. Use the alternatives only if you already know where you want to jump.")
+        destination_cols = st.columns(3)
+        with destination_cols[0]:
+            render_onboarding_destination_card(
+                icon="home",
+                title="Home overview",
+                body="Best first stop for most users. It gives the presentation view and lets you tailor the scenario and audience.",
+                note="Recommended for first-time visitors.",
+                kicker="Recommended",
+                recommended=True,
+            )
+            if st.button("Open Home overview", key="onboarding_open_home", use_container_width=True, type="primary"):
+                _close_onboarding(open_tab="Home")
+                st.rerun()
+        with destination_cols[1]:
+            render_onboarding_destination_card(
+                icon="overview",
+                title="Live monitoring",
+                body="Jump straight into the operational picture with current fleet posture, map context, and risk patterns.",
+                note="Use this if you want to start with the live story.",
+                kicker="Operations",
+            )
+            if st.button(
+                "Jump to live monitoring",
+                key="onboarding_open_overview",
+                use_container_width=True,
+                type="secondary",
+            ):
+                _close_onboarding(open_tab="Overview")
+                st.rerun()
+        with destination_cols[2]:
+            render_onboarding_destination_card(
+                icon="setup",
+                title="Model setup guide",
+                body="Open the setup walkthrough if you want to refresh or explain the detector and threat-typing models first.",
+                note="Use this when setup or refresh is part of the presentation.",
+                kicker="Preparation",
+            )
+            if st.button(
+                "Open model setup guide",
+                key="onboarding_open_setup",
+                use_container_width=True,
+                type="secondary",
+            ):
+                _close_onboarding(open_tab="Home", open_setup=True)
+                st.rerun()
+        if st.button("Back", key="onboarding_back_step6", use_container_width=True, type="secondary"):
             st.session_state.onboarding_step = 5
             st.rerun()
-        return
-
-    if step == 5:
-        render_onboarding_panel(
-            title="How the demo works",
-            body="The walkthrough is intentionally simple for first-time users.",
-            bullets=[
-                "Detect anomaly from recent telemetry.",
-                "Explain the likely threat family with model output plus rules.",
-                "Send the alert to human review with traceable oversight.",
-            ],
-            kicker="Step 5",
-            variant="info",
-        )
-        _render_onboarding_action_hint("One more step: choose where to begin the live demo.")
-        cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step5", use_container_width=True, type="secondary"):
-            st.session_state.onboarding_step = 4
-            st.rerun()
-        if cols[1].button("Next: choose a starting view", key="onboarding_next_step5", use_container_width=True, type="primary"):
-            st.session_state.onboarding_step = 6
-            st.rerun()
-        return
-
-    render_onboarding_panel(
-        title="Where to go next",
-        body="Pick the best starting point for your session.",
-        bullets=[
-            "Home gives the lightweight presentation overview and lets you adjust the audience and scenario.",
-            "Overview shows live monitoring and fleet risk.",
-            "Incidents, Insights, and Governance provide deeper operational and assurance views.",
-        ],
-        kicker="Step 6",
-        variant="info",
-    )
-    _render_onboarding_action_hint("Recommended first stop: Home overview. Use the alternatives only if you already know where you want to jump.")
-    destination_cols = st.columns(3)
-    with destination_cols[0]:
-        render_onboarding_destination_card(
-            icon="home",
-            title="Home overview",
-            body="Best first stop for most users. It gives the presentation view and lets you tailor the scenario and audience.",
-            note="Recommended for first-time visitors.",
-            kicker="Recommended",
-            recommended=True,
-        )
-        if st.button("Open Home overview", key="onboarding_open_home", use_container_width=True, type="primary"):
-            _close_onboarding(open_tab="Home")
-            st.rerun()
-    with destination_cols[1]:
-        render_onboarding_destination_card(
-            icon="overview",
-            title="Live monitoring",
-            body="Jump straight into the operational picture with current fleet posture, map context, and risk patterns.",
-            note="Use this if you want to start with the live story.",
-            kicker="Operations",
-        )
-        if st.button(
-            "Jump to live monitoring",
-            key="onboarding_open_overview",
-            use_container_width=True,
-            type="secondary",
-        ):
-            _close_onboarding(open_tab="Overview")
-            st.rerun()
-    with destination_cols[2]:
-        render_onboarding_destination_card(
-            icon="setup",
-            title="Model setup guide",
-            body="Open the setup walkthrough if you want to refresh or explain the detector and threat-typing models first.",
-            note="Use this when setup or refresh is part of the presentation.",
-            kicker="Preparation",
-        )
-        if st.button(
-            "Open model setup guide",
-            key="onboarding_open_setup",
-            use_container_width=True,
-            type="secondary",
-        ):
-            _close_onboarding(open_tab="Home", open_setup=True)
-            st.rerun()
-    if st.button("Back", key="onboarding_back_step6", use_container_width=True, type="secondary"):
-        st.session_state.onboarding_step = 5
-        st.rerun()
-
-
-def _render_first_open_welcome():
-    _render_first_open_welcome_dialog()
 
 
 @st.dialog("Model setup guide")
@@ -414,6 +425,29 @@ def main():
 
     st.set_page_config(page_title="TRUST AI — Wireless Threats (Sundsvall)", layout="wide")
     inject_global_styles()
+
+    onboarding_active = not st.session_state.get("welcome_prompt_dismissed", False)
+    if onboarding_active:
+        st.markdown(
+            """
+            <style>
+            section[data-testid="stSidebar"] {display: none !important;}
+            button[data-testid="stSidebarCollapseButton"] {display: none !important;}
+            div[data-testid="stSidebarCollapsedControl"] {display: none !important;}
+            .block-container {
+                max-width: 100% !important;
+                padding-top: 1.1rem !important;
+                padding-left: 1.25rem !important;
+                padding-right: 1.25rem !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        _render_first_open_welcome()
+        render_app_footer()
+        return
+
     render_disclaimer_banner()
 
     with st.sidebar:
@@ -533,9 +567,6 @@ def main():
 
     if st.session_state.get("context_change_message"):
         st.info(st.session_state.pop("context_change_message"))
-
-    if not st.session_state.get("welcome_prompt_dismissed", False):
-        _render_first_open_welcome()
 
     store = model_store()
     if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY not in store):
