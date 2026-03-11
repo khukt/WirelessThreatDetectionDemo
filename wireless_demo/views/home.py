@@ -91,8 +91,6 @@ def _render_attack_academy_home(role, scenario):
 
 def _render_restart_onboarding_callout():
     callout_cols = st.columns([3.2, 1])
-    with callout_cols[0]:
-        st.caption("Need the guided intro again? Restart guided onboarding for the next audience using the current scenario and role as defaults.")
     with callout_cols[1]:
         if st.button(
             "Restart guided onboarding",
@@ -113,7 +111,6 @@ def _render_explore_destinations():
         "Once the audience understands the current scenario, choose one of these three routes to begin the walkthrough.",
         kicker="Explore",
     )
-    st.caption("Recommended path: start with Overview, then move to Incidents or Insights depending on whether you want operations or explanation next.")
     path_cols = st.columns(len(QUICK_PATHS))
     for col, (icon, tab_name, copy, caption, recommended) in zip(path_cols, QUICK_PATHS):
         with col:
@@ -196,4 +193,3 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
 
     if st.session_state.get("home_message"):
         st.success(st.session_state.home_message)
-        st.caption("Tabs cannot auto-switch in Streamlit, so use the tab bar above to continue.")

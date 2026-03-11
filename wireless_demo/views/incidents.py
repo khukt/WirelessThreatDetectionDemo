@@ -1,6 +1,6 @@
 import streamlit as st
 
-from ..attack_education import attack_category_caption, render_current_attack_brief
+from ..attack_education import attack_category_caption
 from ..config import CFG
 from ..hitl import get_review_status
 from ..ui_components import incident_category, render_incident_card
@@ -68,8 +68,6 @@ def _filter_incidents(incidents, query, severities, review_states):
 
 def render_incidents_tab(role):
     render_tab_intro("Incidents", role)
-    st.info(f"{role} focus: {ROLE_INCIDENTS_CALLOUT.get(role, ROLE_INCIDENTS_CALLOUT['End User'])}")
-    render_current_attack_brief(st.session_state.get("scenario_selector", "Normal"), role, title="What this attack means")
     render_section_card(
         "Incidents",
         "This is the analyst queue for sorting, filtering, and reviewing incidents before they become operational follow-up actions.",

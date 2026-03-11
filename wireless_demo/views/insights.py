@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import streamlit as st
 from textwrap import dedent, fill
 
-from ..attack_education import render_attack_academy
 from ..config import FEATURE_GLOSSARY
 from ..helpers import shap_pos
 from ..ux import render_focus_callout, render_section_card, render_summary_list, render_tab_intro, style_plotly_figure
@@ -565,11 +564,8 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
     brier_text = _fmt_metric_value(metrics.get("brier"), precision=3)
     tau_text = _fmt_metric_value(type_metrics.get("tau"), precision=2)
     with st.container(border=True):
-        st.caption("AT A GLANCE")
         st.markdown("#### Pipeline summary")
-        st.write(
-            "The figure and this panel tell the same story: detect risk, explain the threat, then present a reviewable incident."
-        )
+        st.write("Detect risk, explain the threat, then present a reviewable incident.")
 
         chip_cols = st.columns(3)
         chip_cols[0].caption("Detector")
@@ -579,7 +575,6 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
         chip_cols[2].caption("Threshold")
         chip_cols[2].write(threshold_text)
 
-        st.caption("MODEL HEALTH")
         metric_cols_top = st.columns(2)
         metric_cols_top[0].metric("AUC", auc_text)
         metric_cols_top[1].metric("Brier", brier_text)
@@ -587,12 +582,12 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
         metric_cols_bottom[0].metric("Features", feature_count)
         metric_cols_bottom[1].metric("Type confidence τ", tau_text)
 
-        st.caption("DECISION STAGES")
-        render_focus_callout("Stage 1 — Detect anomaly", "The binary model converts rolling telemetry into an anomaly probability for each device window.")
-        render_focus_callout("Stage 2 — Explain threat family", "Only suspicious cases go to the attack-type model, which is fused with domain rules for clearer labels.")
-        render_focus_callout("Controls — Calibrate confidence", "Thresholding, conformal p-values, and confidence fusion reduce overconfident alerts before review.")
-
-        st.caption("Human reviewers still approve, reject, or escalate the final incident.")
+        st.markdown(
+            "- **Detect anomaly**: the binary model scores each telemetry window.  \n"
+            "- **Explain threat**: suspicious cases go to the type model plus rules.  \n"
+            "- **Calibrate confidence**: thresholding and p-values reduce overconfident alerts.  \n"
+            "- **Keep humans in control**: reviewers still approve, reject, or escalate incidents."
+        )
 
 
 def _render_model_transparency_card(nonce, role):
@@ -689,10 +684,7 @@ def _render_model_transparency_card(nonce, role):
             settings_df["Value"] = settings_df["Value"].astype(str)
             st.table(settings_df)
 
-    if summary_role:
-        with st.expander("Open technical transparency detail", expanded=False):
-            render_technical_details()
-    else:
+    with st.expander("Open technical transparency detail", expanded=False):
         render_technical_details()
 
     render_section_card(
@@ -711,7 +703,6 @@ def _render_model_transparency_card(nonce, role):
         )
     with right:
         with st.container(border=True):
-            st.caption("Review lens")
             st.markdown("#### What this architecture shows")
             st.markdown(
                 "- **Signals in:** the system collects synthetic operational telemetry.  \n"
@@ -729,23 +720,13 @@ def render_insights_tab(role):
     nonce = st.session_state.ui_nonce
     summary_role = _is_summary_role(role)
     render_tab_intro("Insights", role)
-    render_focus_callout("Role focus", ROLE_INSIGHTS_CALLOUT.get(role, ROLE_INSIGHTS_CALLOUT["End User"]))
     _render_role_summary(role)
-    render_attack_academy(role, selected_scenario=st.session_state.get("scenario_selector", "Normal"))
     _render_model_transparency_card(nonce, role)
-
-    if summary_role:
-        render_section_card(
-            "Technical evidence",
-            "These sections stay available for audit and deeper review, but are collapsed into simpler language for this audience.",
-            kicker="Deep dive",
-        )
-    else:
-        render_section_card(
-            "Technical evidence",
-            "Use these charts and tables to inspect feature importance, calibration quality, and the glossary behind the telemetry features.",
-            kicker="Deep dive",
-        )
+    render_section_card(
+        "Technical evidence",
+        "Open the diagnostics below when you want feature importance, calibration, and the feature glossary.",
+        kicker="Deep dive",
+    )
 
     def render_detailed_analysis():
         col1, col2 = st.columns(2)
@@ -813,8 +794,5 @@ def render_insights_tab(role):
                 )
             )
 
-    if summary_role:
-        with st.expander("Open model diagnostics and glossary", expanded=False):
-            render_detailed_analysis()
-    else:
+    with st.expander("Open model diagnostics and glossary", expanded=False):
         render_detailed_analysis()

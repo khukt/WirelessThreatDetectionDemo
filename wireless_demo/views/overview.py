@@ -6,7 +6,6 @@ import plotly.express as px
 import pydeck as pdk
 import streamlit as st
 
-from ..attack_education import render_current_attack_brief
 from ..config import CFG, DEVICE_TYPES
 from ..hitl import current_hitl_policy, latest_review_for_device
 from ..helpers import conformal_pvalue, haversine_m, meters_to_latlon_offset, severity
@@ -90,9 +89,7 @@ def _scenario_spotlight(df_map, scenario):
 
 def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
     render_tab_intro("Overview", role)
-    render_focus_callout("Role focus", ROLE_OVERVIEW_CALLOUT.get(role, ROLE_OVERVIEW_CALLOUT["End User"]))
     render_scenario_context(scenario)
-    render_current_attack_brief(scenario, role, title="Scenario explainer")
     render_section_card(
         "Live operational picture",
         "Use the map, fleet trends, and queue summary together: the left side shows where the pattern is emerging, while the right side shows how the system prioritizes response.",

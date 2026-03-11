@@ -334,7 +334,7 @@ def inject_global_styles():
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 1.4rem; padding-bottom: 1.5rem;}
+        .block-container {padding-top: 1.0rem; padding-bottom: 1.2rem;}
         .demo-hero {
             padding: 1.1rem 1.2rem;
             border: 1px solid rgba(49, 51, 63, 0.12);
@@ -609,9 +609,9 @@ def inject_global_styles():
         .focus-callout {
             border: 1px solid rgba(49, 51, 63, 0.08);
             border-radius: 16px;
-            padding: 0.8rem 0.9rem;
+            padding: 0.65rem 0.8rem;
             background: rgba(255,255,255,0.82);
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.55rem;
         }
         .focus-callout--info {
             border-color: rgba(37, 99, 235, 0.14);
@@ -635,9 +635,9 @@ def inject_global_styles():
         .summary-list-panel {
             border: 1px solid rgba(49, 51, 63, 0.08);
             border-radius: 16px;
-            padding: 0.85rem 0.95rem;
+            padding: 0.72rem 0.85rem;
             background: rgba(255,255,255,0.78);
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.55rem;
         }
         .summary-list-kicker {
             font-size: 0.72rem;
@@ -672,9 +672,9 @@ def inject_global_styles():
         .section-card {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 16px;
-            padding: 0.9rem 1rem;
+            padding: 0.72rem 0.88rem;
             background: rgba(255,255,255,0.70);
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.55rem;
         }
         .incident-card {
             border: 1px solid rgba(49, 51, 63, 0.10);
@@ -749,9 +749,9 @@ def inject_global_styles():
         .transparency-card {
             border: 1px solid rgba(49, 51, 63, 0.12);
             border-radius: 18px;
-            padding: 1rem 1.1rem;
+            padding: 0.82rem 0.95rem;
             background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(248,250,252,0.92));
-            margin-bottom: 0.9rem;
+            margin-bottom: 0.65rem;
         }
         .transparency-title {
             font-size: 1.15rem;
@@ -942,9 +942,9 @@ def inject_global_styles():
         .tab-intro {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 16px;
-            padding: 0.9rem 1rem;
+            padding: 0.72rem 0.88rem;
             background: rgba(255,255,255,0.78);
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.55rem;
         }
         .tab-intro-title {
             font-size: 1rem;
@@ -953,20 +953,20 @@ def inject_global_styles():
             margin-bottom: 0.2rem;
         }
         .tab-intro-copy {
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             color: rgba(49, 51, 63, 0.78);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
         }
         .tab-intro-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.65rem;
-            margin-top: 0.65rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.45rem;
         }
         .tab-intro-card {
             border: 1px solid rgba(49, 51, 63, 0.08);
             border-radius: 14px;
-            padding: 0.72rem 0.8rem;
+            padding: 0.58rem 0.68rem;
             background: rgba(248,250,252,0.92);
         }
         .tab-intro-card-kicker {
@@ -983,13 +983,13 @@ def inject_global_styles():
             color: rgba(49, 51, 63, 0.78);
         }
         .tab-role-note {
-            margin-top: 0.55rem;
-            padding: 0.48rem 0.7rem;
+            margin-top: 0.4rem;
+            padding: 0.38rem 0.58rem;
             border-radius: 12px;
             background: rgba(239,246,255,0.88);
             border: 1px solid rgba(147, 197, 253, 0.42);
             color: rgba(30, 64, 175, 0.88);
-            font-size: 0.82rem;
+            font-size: 0.79rem;
         }
         .quick-chip-row {
             display: flex;
@@ -1057,10 +1057,10 @@ def inject_global_styles():
         .home-project-shell {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 24px;
-            padding: 1.05rem 1.1rem;
+            padding: 0.82rem 0.92rem;
             background: linear-gradient(135deg, rgba(239,246,255,0.98), rgba(255,255,255,0.94));
             box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
         }
         .home-project-kicker {
             display: inline-block;
@@ -1073,15 +1073,15 @@ def inject_global_styles():
             margin-bottom: 0.45rem;
         }
         .home-project-title {
-            font-size: 1.42rem;
+            font-size: 1.3rem;
             line-height: 1.2;
             font-weight: 800;
             color: rgba(15, 23, 42, 0.98);
-            margin-bottom: 0.28rem;
+            margin-bottom: 0.18rem;
         }
         .home-project-copy {
-            font-size: 0.95rem;
-            line-height: 1.5;
+            font-size: 0.9rem;
+            line-height: 1.42;
             color: rgba(49, 51, 63, 0.78);
         }
         .home-project-chip-row {
@@ -1248,12 +1248,12 @@ def inject_global_styles():
         .home-icon-tile {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 24px;
-            padding: 0.9rem 0.82rem 0.8rem;
+            padding: 0.76rem 0.72rem 0.68rem;
             background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
             box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
             text-align: center;
-            min-height: 184px;
-            margin-bottom: 0.5rem;
+            min-height: 164px;
+            margin-bottom: 0.4rem;
             transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
         }
         .home-icon-tile--recommended {
@@ -1264,7 +1264,7 @@ def inject_global_styles():
         .home-icon-badge {
             width: 56px;
             height: 56px;
-            margin: 0 auto 0.6rem;
+            margin: 0 auto 0.45rem;
             border-radius: 20px;
             display: flex;
             align-items: center;
@@ -1280,10 +1280,10 @@ def inject_global_styles():
             margin-bottom: 0.32rem;
         }
         .home-icon-copy {
-            font-size: 0.82rem;
-            line-height: 1.42;
+            font-size: 0.8rem;
+            line-height: 1.38;
             color: rgba(49, 51, 63, 0.74);
-            min-height: 52px;
+            min-height: 44px;
         }
         .home-icon-caption {
             display: inline-block;
@@ -1762,31 +1762,27 @@ def render_tab_intro(tab_name: str, role: Optional[str] = None):
     role_copy = None
     if role is not None:
         role_copy = ROLE_FOCUS_COPY.get(role, {}).get(tab_name)
+    role_line = f"<div class='tab-role-note'><strong>For {role}:</strong> {role_copy}</div>" if role_copy else ""
     st.markdown(
         f"""
         <div class="tab-intro">
             <div class="tab-intro-title">{tab_name}</div>
-            <div class="tab-intro-copy">Use this section as a guided workspace rather than a raw dashboard.</div>
+            <div class="tab-intro-copy">{copy['summary']}</div>
             <div class="tab-intro-grid">
                 <div class="tab-intro-card">
-                    <div class="tab-intro-card-kicker">Purpose</div>
-                    <div class="tab-intro-card-copy">{copy['summary']}</div>
-                </div>
-                <div class="tab-intro-card">
-                    <div class="tab-intro-card-kicker">What to look for</div>
+                    <div class="tab-intro-card-kicker">Look for</div>
                     <div class="tab-intro-card-copy">{copy['focus']}</div>
                 </div>
                 <div class="tab-intro-card">
-                    <div class="tab-intro-card-kicker">Recommended next step</div>
+                    <div class="tab-intro-card-kicker">Next</div>
                     <div class="tab-intro-card-copy">{copy['next']}</div>
                 </div>
             </div>
+            {role_line}
         </div>
         """,
         unsafe_allow_html=True,
     )
-    if role_copy:
-        st.markdown(f"<div class='tab-role-note'><strong>For {role}:</strong> {role_copy}</div>", unsafe_allow_html=True)
 
 
 def render_role_flow_hint(role: str):

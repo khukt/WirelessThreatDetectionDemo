@@ -16,7 +16,6 @@ ROLE_FLEET_CALLOUT = {
 
 def render_fleet_tab(show_heatmap, role):
     render_tab_intro("Fleet View", role)
-    st.info(f"{role} focus: {ROLE_FLEET_CALLOUT.get(role, ROLE_FLEET_CALLOUT['End User'])}")
     render_section_card(
         "Fleet workspace",
         "Use this tab to compare device behavior, scan for broad drift patterns, and check whether the current scenario is isolated or fleet-wide.",

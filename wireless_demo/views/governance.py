@@ -159,16 +159,15 @@ def _render_pillar_card(pillar):
 def render_governance_tab(role):
     nonce = st.session_state.ui_nonce
     render_tab_intro("Governance", role)
-    render_focus_callout("Role focus", ROLE_GOVERNANCE_CALLOUT.get(role, ROLE_GOVERNANCE_CALLOUT["End User"]))
     render_section_card(
         "EU AI Act — Transparency & Governance",
-        "This page brings together trust controls, human oversight, auditability, and governance gaps visible in the demo. It is a practical demo view, not legal advice.",
+        "This page shows the trust controls, human oversight, and governance gaps visible in the demo.",
         kicker="Trust overview",
     )
     _render_role_governance_summary(role)
     render_section_card(
         "EU Trustworthy AI — 7 Pillars",
-        "Status is shown as Strong, Partial, or Gap based on the controls currently visible inside this demo.",
+        "Status is shown as Strong, Partial, or Gap based on the controls currently visible in the app.",
         kicker="Pillar view",
     )
 
@@ -177,38 +176,31 @@ def render_governance_tab(role):
         with pillar_cols[idx % 2]:
             _render_pillar_card(pillar)
 
-    mid_left, mid_right = st.columns(2)
-    with mid_left:
-        render_section_card(
-            "Training explainer",
-            "How synthetic telemetry, engineered windows, and calibrated model outputs support the demo’s detection pipeline.",
-            kicker="Model lifecycle",
-        )
-        with st.container(border=True):
-            st.markdown(
-                "- **Data generation**: synthetic, physics-inspired telemetry (RF/QoS, GNSS, access/auth, integrity, cellular).  \n"
-                "- **Windows & features**: rolling window statistics (mean/std/min/max/last/slope/z/jump).  \n"
-                "- **Binary detector**: LightGBM, imbalance-aware; conformal p-values.  \n"
-                "- **Type head**: LightGBM multiclass + domain rules (fused), with calibrated confidence.  \n"
-                "- **Thresholding**: suggested threshold = max F1 on validation split."
-            )
-    with mid_right:
-        render_section_card(
-            "Human-in-the-loop controls",
-            "The review loop keeps people accountable for triage outcomes and creates an auditable feedback trail.",
-            kicker="Oversight controls",
-        )
-        with st.container(border=True):
-            st.markdown(
-                "- **Human review states**: incidents can be approved, marked false positive, or escalated before any operational follow-up.  \n"
-                "- **Audit trail**: reviewer role, timestamp, and note are persisted locally for transparency.  \n"
-                "- **Feedback set**: reviewed incidents form a reusable feedback log for future threshold tuning, model refresh, or retraining."
-            )
+    with st.expander("Open implementation detail", expanded=False):
+        mid_left, mid_right = st.columns(2)
+        with mid_left:
+            with st.container(border=True):
+                st.markdown("#### Training lifecycle")
+                st.markdown(
+                    "- **Data generation**: synthetic, physics-inspired telemetry.  \n"
+                    "- **Windows & features**: rolling-window statistics.  \n"
+                    "- **Binary detector**: LightGBM with conformal p-values.  \n"
+                    "- **Type head**: LightGBM multiclass + rules.  \n"
+                    "- **Thresholding**: suggested threshold = max F1 on validation split."
+                )
+        with mid_right:
+            with st.container(border=True):
+                st.markdown("#### Human-in-the-loop controls")
+                st.markdown(
+                    "- **Review states**: approve, false positive, or escalate.  \n"
+                    "- **Audit trail**: reviewer role, timestamp, and note are persisted locally.  \n"
+                    "- **Feedback set**: reviewed incidents can inform future tuning or retraining."
+                )
 
     policy = current_hitl_policy()
     render_section_card(
         "Live oversight status",
-        "This panel summarizes the active HITL policy and the current review outcomes visible in the demo session.",
+        "This panel summarizes the active HITL policy and current review outcomes.",
         kicker="Operations snapshot",
     )
     st.caption(
@@ -244,7 +236,7 @@ def render_governance_tab(role):
 
     render_section_card(
         "Audit trail",
-        "Recent review actions can be inspected and exported so stakeholders can trace how human decisions were made.",
+        "Recent review actions can be inspected and exported.",
         kicker="Traceability",
     )
     if reviews:
@@ -263,10 +255,6 @@ def render_governance_tab(role):
     else:
             render_focus_callout("Audit trail empty", "Triage incidents to generate human review records and populate the audit trail.")
 
-    render_section_card(
-        "Technical training detail",
-        "This expandable section keeps the lower-level training explanation available without overwhelming the main governance narrative.",
-        kicker="Reference detail",
-    )
-    render_training_explainer(nonce)
+    with st.expander("Open technical training detail", expanded=False):
+        render_training_explainer(nonce)
 
