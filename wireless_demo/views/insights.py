@@ -22,17 +22,17 @@ ROLE_INSIGHTS_SUMMARY = {
     "Executive": {
         "title": "Leadership summary",
         "bullets": [
-            "The AI first decides whether behavior looks abnormal, then explains the most likely threat type.",
-            "Confidence checks are built in so alerts are not based on raw model scores alone.",
-            "Human reviewers stay in control of the final operational decision.",
+            "The AI first decides whether behavior looks abnormal, then suggests the most likely threat type.",
+            "Confidence checks reduce reliance on raw model scores alone.",
+            "Human reviewers remain in control of final decisions.",
         ],
     },
     "Regulator": {
         "title": "Assurance summary",
         "bullets": [
-            "This page exposes how the system turns telemetry into alerts, explanations, and human-reviewable outcomes.",
-            "Confidence controls and transparency artifacts are shown inline rather than hidden behind the model.",
-            "Technical detail remains available below for deeper inspection when needed.",
+            "This page shows how telemetry becomes alerts, explanations, and reviewable outcomes.",
+            "Confidence controls and transparency artifacts are visible inline.",
+            "More technical detail remains available below when needed.",
         ],
     },
 }
@@ -47,6 +47,20 @@ def _render_role_summary(role):
     if not summary:
         return
     render_summary_list(summary["title"], summary["bullets"], kicker="Audience summary")
+
+
+def _render_conformal_explainer():
+    render_focus_callout(
+        "What a conformal p-value means",
+        "It is a trust check on the alert score. Higher values mean the current behavior looks more like past examples of that label. Lower values mean the case is less typical, so the app should treat the prediction more cautiously.",
+    )
+
+
+def _render_shap_explainer():
+    render_focus_callout(
+        "What SHAP means",
+        "SHAP shows which inputs pushed a prediction up or down. Larger values mean a feature had more influence on the model's decision for that device or across the dataset.",
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -565,7 +579,7 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
     tau_text = _fmt_metric_value(type_metrics.get("tau"), precision=2)
     with st.container(border=True):
         st.markdown("#### Pipeline summary")
-        st.write("Detect risk, explain the threat, then present a reviewable incident.")
+        st.write("Detect risk, explain the threat, then hand the case to a reviewer.")
 
         chip_cols = st.columns(3)
         chip_cols[0].caption("Detector")
@@ -585,8 +599,8 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
         st.markdown(
             "- **Detect anomaly**: the binary model scores each telemetry window.  \n"
             "- **Explain threat**: suspicious cases go to the type model plus rules.  \n"
-            "- **Calibrate confidence**: thresholding and p-values reduce overconfident alerts.  \n"
-            "- **Keep humans in control**: reviewers still approve, reject, or escalate incidents."
+            "- **Calibrate confidence**: thresholding and p-values reduce overconfidence.  \n"
+            "- **Keep humans in control**: reviewers approve, reject, or escalate incidents."
         )
 
 
@@ -603,8 +617,8 @@ def _render_model_transparency_card(nonce, role):
         <div class="transparency-card">
             <div class="transparency-title">Model transparency card</div>
             <div class="transparency-copy">
-                This demo uses a two-stage decision stack: a binary anomaly detector first decides whether behavior is suspicious,
-                then an attack-type model plus domain rules explain what kind of threat is most likely.
+                This demo uses a two-stage stack: an anomaly detector first decides whether behavior is suspicious,
+                then an attack-type model plus domain rules explains the most likely threat.
             </div>
         </div>
         """
@@ -633,7 +647,8 @@ def _render_model_transparency_card(nonce, role):
         tabs = st.tabs(["How decisions are made", "What influences the model", "Current model settings"])
 
         with tabs[0]:
-            st.caption("Decision walkthrough")
+            st.caption("Decision flow")
+            _render_conformal_explainer()
             decision_df = pd.DataFrame(
                 [
                     {"step": "Input", "description": "Synthetic RF, network, GNSS, access, and integrity telemetry is collected per device."},
@@ -647,7 +662,8 @@ def _render_model_transparency_card(nonce, role):
             st.dataframe(decision_df, width="stretch", hide_index=True)
 
         with tabs[1]:
-            st.caption("Top feature drivers")
+            st.caption("Top drivers")
+            _render_shap_explainer()
             importance = _get_global_importance_df()
             if importance is not None and len(importance) > 0:
                 top_importance = importance.head(10)
@@ -668,7 +684,7 @@ def _render_model_transparency_card(nonce, role):
                 render_focus_callout("Model setup needed", "Run model setup to show the most influential features.", variant="warning")
 
         with tabs[2]:
-            st.caption("Configuration snapshot")
+            st.caption("Configuration")
             settings_df = pd.DataFrame(
                 [
                     {"Setting": "Binary detector", "Value": "LightGBM classifier"},
@@ -689,7 +705,7 @@ def _render_model_transparency_card(nonce, role):
 
     render_section_card(
         "Stakeholder architecture view",
-        "A simplified picture for regulators, executives, and non-technical reviewers showing where AI is used, where confidence is checked, and where humans remain in control.",
+        "A simplified picture showing where AI is used, where confidence is checked, and where humans remain in control.",
         kicker="Architecture lens",
     )
 
@@ -707,12 +723,12 @@ def _render_model_transparency_card(nonce, role):
             st.markdown(
                 "- **Signals in:** the system collects synthetic operational telemetry.  \n"
                 "- **AI decides risk:** the anomaly model estimates whether behavior is suspicious.  \n"
-                "- **Confidence is checked:** thresholding and p-values reduce overconfident alerts.  \n"
+                "- **Confidence is checked:** thresholding and p-values reduce overconfidence.  \n"
                 "- **Threat type is explained:** ML output is fused with domain rules.  \n"
                 "- **Humans remain accountable:** reviewers approve, reject, or escalate incidents."
             )
             st.caption(
-                "This is a decision-support architecture, not an autonomous enforcement system. Human review remains part of the control path."
+                "This is decision support, not autonomous enforcement. Human review remains in the control path."
             )
 
 
@@ -724,7 +740,7 @@ def render_insights_tab(role):
     _render_model_transparency_card(nonce, role)
     render_section_card(
         "Technical evidence",
-        "Open the diagnostics below when you want feature importance, calibration, and the feature glossary.",
+        "Open the diagnostics below for feature importance, calibration, and the glossary.",
         kicker="Deep dive",
     )
 
@@ -734,7 +750,8 @@ def render_insights_tab(role):
         with col1:
             with st.container(border=True):
                 st.markdown("#### Global importance")
-                st.caption("Mean absolute SHAP values show which features influence anomaly decisions most across the dataset.")
+                st.caption("Mean absolute SHAP values show which features matter most across the dataset.")
+                _render_shap_explainer()
                 importance = _get_global_importance_df()
                 if importance is not None and len(importance) > 0:
                     top_importance = importance.head(18)
@@ -751,7 +768,8 @@ def render_insights_tab(role):
         with col2:
             with st.container(border=True):
                 st.markdown("#### Calibration")
-                st.caption("This curve compares model confidence with observed frequency so you can see whether probabilities are trustworthy.")
+                st.caption("This curve compares model confidence with observed frequency to show whether probabilities are trustworthy.")
+                _render_conformal_explainer()
                 evaluation = st.session_state.get("eval") or {}
                 if "te_p" in evaluation and "y_test" in evaluation:
                     te_p = np.array(evaluation["te_p"])
@@ -784,7 +802,7 @@ def render_insights_tab(role):
 
         with st.container(border=True):
             st.markdown("#### Feature glossary")
-            st.caption("A quick reference for the base telemetry features that appear in the model explanations and engineered windows.")
+            st.caption("A quick reference for the base telemetry features used in explanations and engineered windows.")
             st.table(
                 pd.DataFrame(
                     {

@@ -66,35 +66,21 @@ def _filter_incidents(incidents, query, severities, review_states):
     return filtered
 
 
-def render_incidents_tab(role):
+def render_incidents_tab(role, refresh_interval=None):
     render_tab_intro("Incidents", role)
+    all_incidents = st.session_state.get("incidents", [])
+    summary_interval = max(float(refresh_interval), 1.0) if refresh_interval else None
+    queue_interval = max(float(refresh_interval), 1.8) if refresh_interval else None
+
     render_section_card(
         "Incidents",
-        "This is the analyst queue for sorting, filtering, and reviewing incidents before they become operational follow-up actions.",
+        "This is the analyst queue for sorting, filtering, and reviewing incidents before follow-up actions are taken.",
         kicker="Triage workspace",
     )
-    all_incidents = st.session_state.incidents
-    if not all_incidents:
-        current_tick = int(st.session_state.get("tick", 0))
-        warmup_remaining = max(CFG.rolling_len - current_tick, 0)
-        if warmup_remaining > 0:
-            st.info(f"Monitoring is warming up. The detector needs about {CFG.rolling_len} ticks of history before it can emit incidents. {warmup_remaining} more tick(s) to go.")
-        else:
-            st.success("No incidents yet.")
-        st.caption("Use `Auto stream` for continuous playback or `Step once` to advance manually. Threat scenarios start producing incidents after the rolling history buffer fills.")
-        return
-
-    with st.container(border=True):
-        top = st.columns(4)
-        severities = [incident.get("severity", "Low") for incident in all_incidents]
-        top[0].metric("Total incidents", len(all_incidents))
-        top[1].metric("High severity", sum(level == "High" for level in severities))
-        top[2].metric("Latest tick", max(incident.get("tick", 0) for incident in all_incidents))
-        top[3].metric("Unique devices", len({incident["device_id"] for incident in all_incidents}))
 
     render_section_card(
         "Queue filters",
-        "Use these controls to focus the triage queue before switching between category tabs or reviewing individual incident cards.",
+        "Use these controls to focus the queue before switching categories or reviewing incident cards.",
         kicker="Filtering",
     )
     with st.container(border=True):
@@ -130,75 +116,118 @@ def render_incidents_tab(role):
             key="incidents_severity_filter",
         )
 
-    filtered_all = _sort_incidents(_filter_incidents(all_incidents, search_query, severity_filter, review_states), sort_by)
-    review_counts = {
-        "Pending Review": sum(_incident_review_status(incident) == "Pending Review" for incident in all_incidents),
-        "Approved": sum(_incident_review_status(incident) == "Approved" for incident in all_incidents),
-        "False Positive": sum(_incident_review_status(incident) == "False Positive" for incident in all_incidents),
-        "Escalated": sum(_incident_review_status(incident) == "Escalated" for incident in all_incidents),
-    }
+    def _render_incident_summary_content():
+        live_incidents = st.session_state.get("incidents", [])
+        if not live_incidents:
+            return
 
-    with st.container(border=True):
-        summary = st.columns(4)
-        summary[0].metric("Filtered incidents", len(filtered_all))
-        summary[1].metric("Pending review", review_counts["Pending Review"])
-        summary[2].metric("Approved", review_counts["Approved"])
-        summary[3].metric("False positives", review_counts["False Positive"])
+        with st.container(border=True):
+            top = st.columns(4)
+            severities = [incident.get("severity", "Low") for incident in live_incidents]
+            top[0].metric("Total incidents", len(live_incidents))
+            top[1].metric("High severity", sum(level == "High" for level in severities))
+            top[2].metric("Latest tick", max(incident.get("tick", 0) for incident in live_incidents))
+            top[3].metric("Unique devices", len({incident["device_id"] for incident in live_incidents}))
 
-    st.markdown(
-        "<div class='quick-chip-row'>"
-        f"<span class='quick-chip'>Filtered: {len(filtered_all)}</span>"
-        f"<span class='quick-chip'>Escalated: {review_counts['Escalated']}</span>"
-        f"<span class='quick-chip'>Sort: {sort_by}</span>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    def _render_incidents_queue_content():
+        all_incidents = st.session_state.get("incidents", [])
+        if not all_incidents:
+            current_tick = int(st.session_state.get("tick", 0))
+            warmup_remaining = max(CFG.rolling_len - current_tick, 0)
+            if warmup_remaining > 0:
+                st.info(f"Monitoring is warming up. The detector needs about {CFG.rolling_len} ticks of history before it can emit incidents. {warmup_remaining} more tick(s) to go.")
+            else:
+                st.success("No incidents yet.")
+            st.caption("Use `Auto stream` for continuous playback or `Step once` to advance manually. Incidents appear after the rolling history buffer fills.")
+            return
 
-    if search_query or len(severity_filter) < 3 or len(review_states) < 3 or sort_by != "Newest first":
-        st.caption(
-            f"Showing {len(filtered_all)} of {len(all_incidents)} incidents · sorted by {sort_by.lower()}"
+        filtered_all = _sort_incidents(_filter_incidents(all_incidents, search_query, severity_filter, review_states), sort_by)
+        review_counts = {
+            "Pending Review": sum(_incident_review_status(incident) == "Pending Review" for incident in all_incidents),
+            "Approved": sum(_incident_review_status(incident) == "Approved" for incident in all_incidents),
+            "False Positive": sum(_incident_review_status(incident) == "False Positive" for incident in all_incidents),
+            "Escalated": sum(_incident_review_status(incident) == "Escalated" for incident in all_incidents),
+        }
+
+        with st.container(border=True):
+            summary = st.columns(4)
+            summary[0].metric("Filtered incidents", len(filtered_all))
+            summary[1].metric("Pending review", review_counts["Pending Review"])
+            summary[2].metric("Approved", review_counts["Approved"])
+            summary[3].metric("False positives", review_counts["False Positive"])
+
+        st.markdown(
+            "<div class='quick-chip-row'>"
+            f"<span class='quick-chip'>Filtered: {len(filtered_all)}</span>"
+            f"<span class='quick-chip'>Escalated: {review_counts['Escalated']}</span>"
+            f"<span class='quick-chip'>Sort: {sort_by}</span>"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
-    if not filtered_all:
-        st.info("No incidents match the current filters. Broaden the search, review status, or severity settings.")
-        return
-
-    category_map = {}
-    for incident in filtered_all:
-        category_map.setdefault(incident_category(incident), []).append(incident)
-    order = ["Jamming", "Access Breach", "GPS Spoofing", "Data Tamper", "Other"]
-    categories = [cat for cat in order if cat in category_map] + [cat for cat in category_map if cat not in order]
-    tabs = st.tabs([f"{cat} ({len(category_map[cat])})" for cat in categories] + [f"All ({len(filtered_all)})"])
-
-    for idx, cat in enumerate(categories):
-        with tabs[idx]:
-            render_section_card(
-                f"{cat} incidents",
-                "These incidents share the same attack family after the current triage filters and are ordered using the queue policy above.",
-                kicker="Category view",
+        if search_query or len(severity_filter) < 3 or len(review_states) < 3 or sort_by != "Newest first":
+            st.caption(
+                f"Showing {len(filtered_all)} of {len(all_incidents)} incidents · sorted by {sort_by.lower()}"
             )
-            st.caption(f"{len(category_map[cat])} incidents in {cat.lower()} after the current triage filters.")
-            st.info(attack_category_caption(cat))
+
+        if not filtered_all:
+            st.info("No incidents match the current filters. Broaden the search, review status, or severity settings.")
+            return
+
+        category_map = {}
+        for incident in filtered_all:
+            category_map.setdefault(incident_category(incident), []).append(incident)
+        order = ["Jamming", "Access Breach", "GPS Spoofing", "Data Tamper", "Other"]
+        categories = [cat for cat in order if cat in category_map] + [cat for cat in category_map if cat not in order]
+        tabs = st.tabs([f"{cat} ({len(category_map[cat])})" for cat in categories] + [f"All ({len(filtered_all)})"])
+
+        for idx, cat in enumerate(categories):
+            with tabs[idx]:
+                render_section_card(
+                    f"{cat} incidents",
+                    "These incidents share the same attack family after the current triage filters and queue ordering.",
+                    kicker="Category view",
+                )
+                st.caption(f"{len(category_map[cat])} incidents in {cat.lower()} after the current triage filters.")
+                st.info(attack_category_caption(cat))
+                shown = 0
+                for incident in category_map[cat]:
+                    render_incident_card(incident, role, scope=f"cat_{cat}")
+                    shown += 1
+                    if shown >= max_items:
+                        break
+                if len(category_map[cat]) > max_items:
+                    st.caption(f"Showing the top {max_items} incidents in this category.")
+
+        with tabs[-1]:
+            render_section_card(
+                "All filtered incidents",
+                "This tab shows the full queue after all current filters and sorting rules are applied.",
+                kicker="Combined view",
+            )
             shown = 0
-            for incident in category_map[cat]:
-                render_incident_card(incident, role, scope=f"cat_{cat}")
+            for incident in filtered_all:
+                render_incident_card(incident, role, scope="all")
                 shown += 1
                 if shown >= max_items:
                     break
-            if len(category_map[cat]) > max_items:
-                st.caption(f"Showing the top {max_items} incidents in this category.")
+            if len(filtered_all) > max_items:
+                st.caption(f"Showing the top {max_items} incidents after filtering.")
 
-    with tabs[-1]:
-        render_section_card(
-            "All filtered incidents",
-            "This tab shows the combined triage queue after all current filters and sorting rules have been applied.",
-            kicker="Combined view",
-        )
-        shown = 0
-        for incident in filtered_all:
-            render_incident_card(incident, role, scope="all")
-            shown += 1
-            if shown >= max_items:
-                break
-        if len(filtered_all) > max_items:
-            st.caption(f"Showing the top {max_items} incidents after filtering.")
+    if summary_interval:
+        @st.fragment(run_every=summary_interval)
+        def _render_incidents_summary_fragment():
+            _render_incident_summary_content()
+
+        _render_incidents_summary_fragment()
+    else:
+        _render_incident_summary_content()
+
+    if queue_interval:
+        @st.fragment(run_every=queue_interval)
+        def _render_incidents_queue_fragment():
+            _render_incidents_queue_content()
+
+        _render_incidents_queue_fragment()
+    else:
+        _render_incidents_queue_content()

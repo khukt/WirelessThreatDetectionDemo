@@ -49,6 +49,8 @@ ONBOARDING_STEP_TITLES = {
     5: "Workflow",
     6: "Next",
 }
+PRESENTATION_REFRESH_MS = 1800
+PRESENTATION_SPEED = 1
 
 
 def _apply_pending_home_actions():
@@ -399,12 +401,12 @@ def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role
     refresh_interval = refresh_ms / 1000 if auto and st.session_state.get("model") is not None else None
     tab_order = ROLE_TAB_ORDER.get(role, ROLE_TAB_ORDER["End User"])
     tab_renderers = {
-        "Home": lambda: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
-        "Overview": lambda: render_overview_tab(scenario, show_map, type_filter, use_conformal, role),
-        "Fleet View": lambda: render_fleet_tab(show_heatmap, role),
-        "Incidents": lambda: render_incidents_tab(role),
-        "Insights": lambda: render_insights_tab(role),
-        "Governance": lambda: render_governance_tab(role),
+        "Home": lambda refresh_interval=None: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
+        "Overview": lambda refresh_interval=None: render_overview_tab(scenario, show_map, type_filter, use_conformal, role, refresh_interval=refresh_interval),
+        "Fleet View": lambda refresh_interval=None: render_fleet_tab(show_heatmap, role, refresh_interval=refresh_interval),
+        "Incidents": lambda refresh_interval=None: render_incidents_tab(role, refresh_interval=refresh_interval),
+        "Insights": lambda refresh_interval=None: render_insights_tab(role),
+        "Governance": lambda refresh_interval=None: render_governance_tab(role),
     }
     live_tabs = {"Overview", "Fleet View", "Incidents"}
 
@@ -424,24 +426,24 @@ def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role
         tab_renderers[selected_tab]()
         return
 
+    @st.fragment(run_every=refresh_interval)
+    def run_background_tick_fragment():
+        for _ in range(speed):
+            tick_once(scenario, use_conformal)
+
     if selected_tab not in live_tabs:
         tab_renderers[selected_tab]()
-
-        @st.fragment(run_every=refresh_interval)
-        def run_background_tick_fragment():
-            for _ in range(speed):
-                tick_once(scenario, use_conformal)
-
         run_background_tick_fragment()
         return
 
-    @st.fragment(run_every=refresh_interval)
-    def render_live_workflow_fragment():
-        for _ in range(speed):
-            tick_once(scenario, use_conformal)
-        tab_renderers[selected_tab]()
+    tab_renderers[selected_tab](refresh_interval=refresh_interval)
+    run_background_tick_fragment()
 
-    render_live_workflow_fragment()
+
+def _effective_playback_settings(refresh_ms: int, speed: int, presentation_mode: bool):
+    if not presentation_mode:
+        return refresh_ms, speed
+    return max(int(refresh_ms), PRESENTATION_REFRESH_MS), min(int(speed), PRESENTATION_SPEED)
 
 
 def main():
@@ -528,8 +530,14 @@ def main():
             speed = st.slider("Playback speed (ticks/refresh)", 1, 10, 3)
             auto = st.checkbox("Auto stream", True)
             refresh_ms = st.slider("Auto refresh cadence (ms)", 300, 3000, 1200, 100, disabled=not auto)
+            presentation_mode = st.checkbox("Presentation mode", value=st.session_state.get("presentation_mode", False), key="presentation_mode")
+            effective_refresh_ms, effective_speed = _effective_playback_settings(refresh_ms, speed, presentation_mode)
             reset = st.button("Reset session", use_container_width=True)
             render_sidebar_hint("Playback tip", "Use slower cadence for presentations and faster cadence when you want incidents to populate quickly.")
+            if presentation_mode:
+                st.caption(
+                    f"Presentation pacing active · using {effective_speed} tick per refresh and at least {effective_refresh_ms} ms between UI updates."
+                )
 
         with st.expander("Model behavior", expanded=False):
             use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True)
@@ -654,9 +662,9 @@ def main():
         _render_initial_training_prompt()
 
     _render_live_workflow(
-        refresh_ms=refresh_ms,
+        refresh_ms=effective_refresh_ms,
         auto=auto,
-        speed=speed,
+        speed=effective_speed,
         scenario=scenario,
         use_conformal=use_conformal,
         role=role,

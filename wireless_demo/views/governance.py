@@ -29,17 +29,17 @@ ROLE_GOVERNANCE_SUMMARY = {
     "Executive": {
         "title": "Leadership summary",
         "bullets": [
-            "The demo keeps humans in the loop for every incident decision.",
-            "Transparency and audit trails are visible, but some governance controls are still roadmap items.",
-            "The strongest current areas are oversight and transparency; fairness and broader impact controls remain gaps.",
+            "Human review is built into incident decisions.",
+            "Audit and transparency evidence are visible in the app.",
+            "The largest remaining gaps are fairness, impact assessment, and formal accountability.",
         ],
     },
     "Regulator": {
         "title": "Assurance summary",
         "bullets": [
-            "Human review, audit logging, and visible escalation paths are present in the demo workflow.",
-            "Transparency artifacts are exposed inline, including model logic, confidence controls, and review history.",
-            "Several pillars remain partial or gap-level because formal governance, fairness measurement, and impact assessment are not yet implemented.",
+            "Human review, audit logging, and escalation are visible in the workflow.",
+            "Model logic, confidence controls, and review history are exposed inline.",
+            "Formal governance, fairness measurement, and impact assessment are still incomplete.",
         ],
     },
 }
@@ -56,13 +56,43 @@ PILLAR_STATUS_STYLE = {
     "Gap": "background: rgba(239, 68, 68, 0.14); color: #991b1b;",
 }
 
+PILLAR_STATUS_VARIANT = {
+    "Strong": "success",
+    "Partial": "warning",
+    "Gap": "warning",
+}
+
+PILLAR_GROUP_META = {
+    "Strong": {
+        "title": "Implemented well in the demo",
+        "copy": "These controls are already easy to show and explain.",
+        "badge_class": "governance-group-badge--strong",
+    },
+    "Partial": {
+        "title": "Visible, but incomplete",
+        "copy": "These controls exist, but they need stronger process or measurement support.",
+        "badge_class": "governance-group-badge--partial",
+    },
+    "Gap": {
+        "title": "Still roadmap-level",
+        "copy": "These areas are not mature enough yet to support a strong governance claim.",
+        "badge_class": "governance-group-badge--gap",
+    },
+}
+
+PILLAR_STATUS_SCORE = {
+    "Strong": 1.0,
+    "Partial": 0.5,
+    "Gap": 0.0,
+}
+
 
 TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Human Agency and Oversight",
         "status": "Strong",
-        "evidence": "Human review states, escalation, false-positive handling, and HITL policy controls are active in the incident workflow.",
-        "gap": "Still a demo; there is no formal approval workflow tied to downstream real-world enforcement.",
+        "evidence": "Review states, escalation, and false-positive handling are active in the incident flow.",
+        "gap": "There is no formal approval chain for real-world enforcement.",
         "next_actions": [
             "Add explicit reviewer assignment and approval ownership.",
             "Show escalation paths and who is accountable for each step.",
@@ -72,8 +102,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Technical Robustness and Safety",
         "status": "Partial",
-        "evidence": "The app uses calibrated confidence, thresholding, conformal p-values, and fallback rule fusion for type decisions.",
-        "gap": "It does not provide formal safety cases, adversarial testing coverage, or production-grade fail-safe controls.",
+        "evidence": "The app uses calibrated confidence, thresholding, and rule fallback.",
+        "gap": "Formal safety cases, adversarial testing, and fail-safe controls are not shown.",
         "next_actions": [
             "Add stress tests for noisy and adversarial telemetry.",
             "Document fail-safe behavior when models or data are unavailable.",
@@ -83,8 +113,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Privacy and Data Governance",
         "status": "Partial",
-        "evidence": "The demo uses synthetic telemetry, which reduces personal-data exposure and simplifies governance concerns.",
-        "gap": "It does not yet expose retention policy, access control, lineage, consent, or data stewardship controls.",
+        "evidence": "Synthetic telemetry reduces privacy exposure in the demo.",
+        "gap": "Retention, access control, lineage, and stewardship are not yet surfaced.",
         "next_actions": [
             "Add a data lineage and retention summary in Governance.",
             "Expose who can access logs, reviews, and model artifacts.",
@@ -94,8 +124,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Transparency",
         "status": "Strong",
-        "evidence": "The app explains model flow, feature impact, calibration, attack typing logic, and keeps a local human review audit log.",
-        "gap": "There is room for even clearer end-user explanation text on limitations and confidence uncertainty.",
+        "evidence": "Model flow, feature impact, calibration, and review logging are visible.",
+        "gap": "Limitations and uncertainty could still be explained more simply.",
         "next_actions": [
             "Add uncertainty guidance directly beside live incident cards.",
             "Show known model limitations for each scenario in plain language.",
@@ -105,8 +135,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Diversity, Non-discrimination and Fairness",
         "status": "Gap",
-        "evidence": "The app distinguishes device types and roles, but it does not currently measure fairness or subgroup performance.",
-        "gap": "No fairness metrics, bias checks, or comparative error analysis by subgroup are implemented yet.",
+        "evidence": "The app distinguishes device types and roles, but not fairness outcomes.",
+        "gap": "Fairness metrics, bias checks, and subgroup error analysis are missing.",
         "next_actions": [
             "Evaluate error rates by device type, scenario, and operating profile.",
             "Add subgroup drift and disparate performance checks.",
@@ -116,8 +146,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Societal and Environmental Well-being",
         "status": "Gap",
-        "evidence": "The app frames itself as a decision-support demo rather than autonomous control for critical infrastructure.",
-        "gap": "No explicit societal impact, sustainability, or broader public-interest assessment is shown in the current UI.",
+        "evidence": "The app is positioned as decision support, not autonomous control.",
+        "gap": "Societal impact, sustainability, and public-interest assessment are not shown.",
         "next_actions": [
             "Add a short impact assessment for critical infrastructure use cases.",
             "Document operational benefits, risks, and potential unintended harms.",
@@ -127,8 +157,8 @@ TRUSTWORTHY_AI_PILLARS = [
     {
         "title": "Accountability",
         "status": "Partial",
-        "evidence": "Reviewer actions are logged, downloadable, and visible in governance, which supports traceability and auditability.",
-        "gap": "There is no formal ownership matrix, sign-off workflow, incident escalation chain, or policy attestation layer.",
+        "evidence": "Reviewer actions are logged and downloadable for audit.",
+        "gap": "Ownership, sign-off, and escalation governance are not yet formalized.",
         "next_actions": [
             "Define ownership for model updates, approvals, and incidents.",
             "Add sign-off records for major model refreshes.",
@@ -156,29 +186,205 @@ def _render_pillar_card(pillar):
         st.markdown("\n".join([f"- {action}" for action in pillar.get("next_actions", [])]))
 
 
-def render_governance_tab(role):
-    nonce = st.session_state.ui_nonce
-    render_tab_intro("Governance", role)
-    render_section_card(
-        "EU AI Act — Transparency & Governance",
-        "This page shows the trust controls, human oversight, and governance gaps visible in the demo.",
-        kicker="Trust overview",
+def _render_governance_scorecard(strong_count, partial_count, gap_count, reviews, status_counts):
+    readiness_score = int(
+        round(
+            (sum(PILLAR_STATUS_SCORE[pillar["status"]] for pillar in TRUSTWORTHY_AI_PILLARS) / len(TRUSTWORTHY_AI_PILLARS))
+            * 100
+        )
     )
-    _render_role_governance_summary(role)
+    active_reviews = status_counts["Approved"] + status_counts["Escalated"] + status_counts["False Positive"]
+    policy = current_hitl_policy()
+    oversight_strength = "Strong" if policy["suppression_enabled"] and active_reviews > 0 else "Developing"
+    roadmap_pressure = "High" if gap_count >= 2 else ("Moderate" if gap_count == 1 else "Low")
+
+    st.markdown(
+        """
+        <div class="governance-scorecard-grid">
+        """
+        f"""
+            <div class="governance-scorecard governance-scorecard--primary">
+                <div class="governance-scorecard-kicker">Readiness</div>
+                <div class="governance-scorecard-value">{readiness_score}%</div>
+                <div class="governance-scorecard-copy">Based on Strong / Partial / Gap status across the seven pillars.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Oversight strength</div>
+                <div class="governance-scorecard-value">{oversight_strength}</div>
+                <div class="governance-scorecard-copy">{len(reviews)} review record(s) and live HITL controls are visible.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Transparency coverage</div>
+                <div class="governance-scorecard-value">{strong_count + partial_count}/7</div>
+                <div class="governance-scorecard-copy">Pillars with at least visible controls or supporting evidence.</div>
+            </div>
+            <div class="governance-scorecard">
+                <div class="governance-scorecard-kicker">Roadmap pressure</div>
+                <div class="governance-scorecard-value">{roadmap_pressure}</div>
+                <div class="governance-scorecard-copy">{gap_count} pillar gap(s) still need governance or measurement work.</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_pillar_group_header(status, count):
+    meta = PILLAR_GROUP_META[status]
+    st.markdown(
+        f"""
+        <div class="governance-group-header">
+            <div>
+                <div class="governance-group-kicker">Pillar group</div>
+                <div class="governance-group-title">{meta['title']}</div>
+                <div class="governance-group-copy">{meta['copy']}</div>
+            </div>
+            <div class="governance-group-badge-wrap">
+                <span class="governance-group-badge {meta['badge_class']}">{status}</span>
+                <span class="governance-group-count">{count} pillar{'s' if count != 1 else ''}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_governance_snapshot(role, reviews, status_counts):
+    strong_count = sum(pillar["status"] == "Strong" for pillar in TRUSTWORTHY_AI_PILLARS)
+    partial_count = sum(pillar["status"] == "Partial" for pillar in TRUSTWORTHY_AI_PILLARS)
+    gap_count = sum(pillar["status"] == "Gap" for pillar in TRUSTWORTHY_AI_PILLARS)
+
+    render_section_card(
+        "Governance readiness snapshot",
+        "Start here for the trust story: what is visible now, what still relies on human review, and where the biggest gaps remain.",
+        kicker="Snapshot",
+    )
+
+    snapshot_cols = st.columns(4)
+    snapshot_cols[0].metric("Strong pillars", strong_count)
+    snapshot_cols[1].metric("Partial pillars", partial_count)
+    snapshot_cols[2].metric("Gap pillars", gap_count)
+    snapshot_cols[3].metric("Reviewed incidents", len(reviews))
+
+    _render_governance_scorecard(strong_count, partial_count, gap_count, reviews, status_counts)
+
+    summary_cols = st.columns([1.15, 1.35])
+    with summary_cols[0]:
+        _render_role_governance_summary(role)
+    with summary_cols[1]:
+        render_summary_list(
+            "What is visible right now",
+            [
+                "Human review is present in the incident workflow.",
+                "Audit evidence is downloadable with role, time, and notes.",
+                "The largest gaps are fairness, impact assessment, and formal accountability.",
+            ],
+            kicker="Assurance summary",
+        )
+
+    if gap_count > 0:
+        render_focus_callout(
+            "Main governance gap",
+            "The demo is strongest on transparency and oversight. The weakest areas remain fairness, impact assessment, and formal accountability workflows.",
+            variant="warning",
+        )
+
+    st.markdown(
+        "<div class='quick-chip-row'>"
+        f"<span class='quick-chip'>Pending review: {status_counts['Pending Review']}</span>"
+        f"<span class='quick-chip'>Approved: {status_counts['Approved']}</span>"
+        f"<span class='quick-chip'>False positives: {status_counts['False Positive']}</span>"
+        f"<span class='quick-chip'>Escalated: {status_counts['Escalated']}</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_pillars_overview():
     render_section_card(
         "EU Trustworthy AI — 7 Pillars",
-        "Status is shown as Strong, Partial, or Gap based on the controls currently visible in the app.",
+        "Pillars are grouped by maturity so viewers can scan strengths first, then partial areas, then roadmap gaps.",
         kicker="Pillar view",
     )
 
-    pillar_cols = st.columns(2)
-    for idx, pillar in enumerate(TRUSTWORTHY_AI_PILLARS):
-        with pillar_cols[idx % 2]:
-            _render_pillar_card(pillar)
+    for status in ["Strong", "Partial", "Gap"]:
+        pillars = [pillar for pillar in TRUSTWORTHY_AI_PILLARS if pillar["status"] == status]
+        if not pillars:
+            continue
 
-    with st.expander("Open implementation detail", expanded=False):
-        mid_left, mid_right = st.columns(2)
-        with mid_left:
+        _render_pillar_group_header(status, len(pillars))
+        render_focus_callout(PILLAR_GROUP_META[status]["title"], PILLAR_GROUP_META[status]["copy"], variant=PILLAR_STATUS_VARIANT[status])
+        pillar_cols = st.columns(2)
+        for idx, pillar in enumerate(pillars):
+            with pillar_cols[idx % 2]:
+                _render_pillar_card(pillar)
+
+
+def _render_live_oversight_section(reviews, status_counts):
+    policy = current_hitl_policy()
+    hitl_live_stats = st.session_state.get("hitl_live_stats", {})
+    latest_effect = hitl_live_stats.get("last_effect")
+
+    render_section_card(
+        "Live oversight status",
+        "This section shows the active HITL policy, current review mix, and the latest queue intervention.",
+        kicker="Operations snapshot",
+    )
+
+    st.caption(
+        f"Active HITL policy · suppression: {'enabled' if policy['suppression_enabled'] else 'disabled'} · "
+        f"window: {policy['suppression_ticks']} ticks · escalation boost: {policy['escalation_boost']:.2f}"
+    )
+
+    top_cols = st.columns(4)
+    top_cols[0].metric("Pending review", status_counts["Pending Review"])
+    top_cols[1].metric("Approved", status_counts["Approved"])
+    top_cols[2].metric("False positives", status_counts["False Positive"])
+    top_cols[3].metric("Escalated", status_counts["Escalated"])
+
+    live_cols = st.columns(3)
+    live_cols[0].metric("Suppressed repeats", hitl_live_stats.get("suppressed_alerts", 0))
+    live_cols[1].metric("Prioritized alerts", hitl_live_stats.get("prioritized_alerts", 0))
+    live_cols[2].metric("Latest HITL effect", latest_effect.get("effect", "None") if latest_effect else "None")
+
+    if latest_effect:
+        render_focus_callout(
+            "Latest intervention",
+            f"{latest_effect['effect']} affected {latest_effect['device_id']} at tick {latest_effect['tick']}. Reason: {latest_effect.get('reason') or 'No reason recorded.'}",
+            variant="info",
+        )
+    elif not reviews:
+        render_focus_callout(
+            "No review history yet",
+            "Triage a few incidents to show how human decisions affect suppression, prioritization, and auditability.",
+            variant="info",
+        )
+
+
+def _render_audit_section(reviews, nonce):
+    render_section_card(
+        "Audit trail",
+        "Review evidence is visible here for inspection and export, making the human oversight story easy to verify.",
+        kicker="Traceability",
+    )
+
+    if reviews:
+        review_df, display_cols, export_json = _prepare_review_audit_artifacts(pd.DataFrame(reviews).to_json(orient="records"))
+        st.caption("Recent human review log")
+        st.dataframe(review_df[display_cols], width="stretch", hide_index=True)
+        st.download_button(
+            "Download review audit log",
+            data=export_json,
+            file_name="hitl_review_log.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    else:
+        render_focus_callout("Audit trail empty", "Triage incidents to generate human review records and populate the audit trail.")
+
+    with st.expander("Implementation and training detail", expanded=False):
+        detail_cols = st.columns(2)
+        with detail_cols[0]:
             with st.container(border=True):
                 st.markdown("#### Training lifecycle")
                 st.markdown(
@@ -188,7 +394,7 @@ def render_governance_tab(role):
                     "- **Type head**: LightGBM multiclass + rules.  \n"
                     "- **Thresholding**: suggested threshold = max F1 on validation split."
                 )
-        with mid_right:
+        with detail_cols[1]:
             with st.container(border=True):
                 st.markdown("#### Human-in-the-loop controls")
                 st.markdown(
@@ -197,15 +403,16 @@ def render_governance_tab(role):
                     "- **Feedback set**: reviewed incidents can inform future tuning or retraining."
                 )
 
-    policy = current_hitl_policy()
+        render_training_explainer(nonce)
+
+
+def render_governance_tab(role):
+    nonce = st.session_state.ui_nonce
+    render_tab_intro("Governance", role)
     render_section_card(
-        "Live oversight status",
-        "This panel summarizes the active HITL policy and current review outcomes.",
-        kicker="Operations snapshot",
-    )
-    st.caption(
-        f"Active HITL policy · suppression: {'enabled' if policy['suppression_enabled'] else 'disabled'} · "
-        f"window: {policy['suppression_ticks']} ticks · escalation boost: {policy['escalation_boost']:.2f}"
+        "EU AI Act — Transparency & Governance",
+        "This page shows the trust controls, human oversight, and governance gaps visible in the demo, with the key assurance evidence first.",
+        kicker="Trust overview",
     )
 
     reviews = review_rows()
@@ -215,46 +422,8 @@ def render_governance_tab(role):
         status = matched.get("status") if matched else "Pending Review"
         status_counts[status] = status_counts.get(status, 0) + 1
 
-    with st.container(border=True):
-        cols = st.columns(4)
-        cols[0].metric("Pending review", status_counts["Pending Review"])
-        cols[1].metric("Approved", status_counts["Approved"])
-        cols[2].metric("False positives", status_counts["False Positive"])
-        cols[3].metric("Escalated", status_counts["Escalated"])
-
-    hitl_live_stats = st.session_state.get("hitl_live_stats", {})
-    with st.container(border=True):
-        live_cols = st.columns(3)
-        live_cols[0].metric("Suppressed repeats", hitl_live_stats.get("suppressed_alerts", 0))
-        live_cols[1].metric("Prioritized alerts", hitl_live_stats.get("prioritized_alerts", 0))
-        latest_effect = hitl_live_stats.get("last_effect")
-        live_cols[2].metric("Latest HITL effect", latest_effect.get("effect", "None") if latest_effect else "None")
-    if latest_effect:
-        st.caption(
-            f"Latest live intervention: {latest_effect['effect']} {latest_effect['device_id']} at tick {latest_effect['tick']} · {latest_effect.get('reason') or 'No reason recorded.'}"
-        )
-
-    render_section_card(
-        "Audit trail",
-        "Recent review actions can be inspected and exported.",
-        kicker="Traceability",
-    )
-    if reviews:
-        with st.container(border=True):
-            st.caption("Recent human review log")
-            reviews_json = pd.DataFrame(reviews).to_json(orient="records")
-            review_df, display_cols, export_json = _prepare_review_audit_artifacts(reviews_json)
-            st.dataframe(review_df[display_cols], width="stretch", hide_index=True)
-            st.download_button(
-                "Download review audit log",
-                data=export_json,
-                file_name="hitl_review_log.json",
-                mime="application/json",
-                use_container_width=True,
-            )
-    else:
-            render_focus_callout("Audit trail empty", "Triage incidents to generate human review records and populate the audit trail.")
-
-    with st.expander("Open technical training detail", expanded=False):
-        render_training_explainer(nonce)
+    _render_governance_snapshot(role, reviews, status_counts)
+    _render_pillars_overview()
+    _render_live_oversight_section(reviews, status_counts)
+    _render_audit_section(reviews, nonce)
 

@@ -335,6 +335,47 @@ def inject_global_styles():
         """
         <style>
         .block-container {padding-top: 1.0rem; padding-bottom: 1.2rem;}
+        div[data-testid="stMetric"] {
+            background: rgba(255,255,255,0.84);
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            padding: 0.5rem 0.65rem;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+        }
+        div[data-testid="stMetricLabel"] {
+            color: rgba(71, 85, 105, 0.82);
+        }
+        div[data-testid="stMetricValue"] {
+            color: rgba(15, 23, 42, 0.96);
+        }
+        div[data-testid="stAlert"] {
+            border-radius: 16px;
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            background: rgba(255,255,255,0.72);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+            overflow: hidden;
+            margin-bottom: 0.55rem;
+        }
+        div[data-testid="stExpander"] details summary {
+            padding-top: 0.12rem;
+            padding-bottom: 0.12rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
+        }
+        div[data-testid="stDataFrame"], div[data-testid="stTable"] {
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+            background: rgba(255,255,255,0.88);
+        }
+        div[data-testid="stMarkdownContainer"] p {
+            margin-bottom: 0.45rem;
+        }
         .demo-hero {
             padding: 1.1rem 1.2rem;
             border: 1px solid rgba(49, 51, 63, 0.12);
@@ -1036,6 +1077,128 @@ def inject_global_styles():
             font-size: 0.89rem;
             color: rgba(49, 51, 63, 0.78);
             margin-bottom: 0.35rem;
+        }
+        .governance-scorecard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin: 0.15rem 0 0.75rem;
+        }
+        .governance-scorecard {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 18px;
+            padding: 0.82rem 0.88rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9));
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+        }
+        .governance-scorecard--primary {
+            border-color: rgba(37, 99, 235, 0.18);
+            background: linear-gradient(180deg, rgba(239,246,255,0.96), rgba(255,255,255,0.94));
+            box-shadow: 0 12px 26px rgba(37, 99, 235, 0.08);
+        }
+        .governance-scorecard-kicker {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.72);
+            font-weight: 700;
+            margin-bottom: 0.22rem;
+        }
+        .governance-scorecard-value {
+            font-size: 1.45rem;
+            line-height: 1.1;
+            font-weight: 800;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.22rem;
+        }
+        .governance-scorecard-copy {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: rgba(49, 51, 63, 0.74);
+        }
+        .governance-group-header {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 18px;
+            padding: 0.78rem 0.88rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+            margin: 0.2rem 0 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            gap: 0.8rem;
+            align-items: center;
+        }
+        .governance-group-kicker {
+            font-size: 0.71rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.72);
+            font-weight: 700;
+            margin-bottom: 0.18rem;
+        }
+        .governance-group-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.14rem;
+        }
+        .governance-group-copy {
+            font-size: 0.82rem;
+            line-height: 1.4;
+            color: rgba(49, 51, 63, 0.74);
+            max-width: 42rem;
+        }
+        .governance-group-badge-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.28rem;
+            white-space: nowrap;
+        }
+        .governance-group-badge {
+            display: inline-block;
+            padding: 0.22rem 0.62rem;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            border: 1px solid transparent;
+        }
+        .governance-group-badge--strong {
+            background: rgba(22, 163, 74, 0.12);
+            color: #166534;
+            border-color: rgba(22, 163, 74, 0.20);
+        }
+        .governance-group-badge--partial {
+            background: rgba(245, 158, 11, 0.14);
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.20);
+        }
+        .governance-group-badge--gap {
+            background: rgba(239, 68, 68, 0.12);
+            color: #991b1b;
+            border-color: rgba(239, 68, 68, 0.18);
+        }
+        .governance-group-count {
+            font-size: 0.76rem;
+            color: rgba(71, 85, 105, 0.82);
+            font-weight: 700;
+        }
+        @media (max-width: 1100px) {
+            .governance-scorecard-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 700px) {
+            .governance-scorecard-grid {
+                grid-template-columns: 1fr;
+            }
+            .governance-group-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .governance-group-badge-wrap {
+                align-items: flex-start;
+            }
         }
         .home-hero {
             border: 1px solid rgba(49, 51, 63, 0.10);

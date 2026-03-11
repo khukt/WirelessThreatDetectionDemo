@@ -1,4 +1,5 @@
 import math
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -12,124 +13,147 @@ from ..helpers import conformal_pvalue, haversine_m, meters_to_latlon_offset, se
 from ..ux import render_focus_callout, render_scenario_context, render_section_card, render_tab_intro, style_plotly_figure
 
 
-ROLE_OVERVIEW_CALLOUT = {
-    "End User": "Watch the risk summary, map, and triage queue to see what needs action now.",
-    "Domain Expert": "Correlate the scenario, top contributors, and queue ranking to judge whether the pattern looks operationally plausible.",
-    "Regulator": "Use this as the entry point for understanding how the system surfaces risk before a human review decision is made.",
-    "AI Builder": "Connect live alerting behavior to the thresholds, confidence controls, and queue policy behind it.",
-    "Executive": "Use this page to understand current exposure, where it is concentrated, and whether response remains controlled.",
-}
-
-
-@st.cache_data(show_spinner=False)
-def _cached_circle_path(center_lat, center_lon, radius_m, lat_mean, n_points=60):
-    angles = np.linspace(0, 2 * np.pi, n_points)
+@lru_cache(maxsize=64)
+def _cached_circle_path(lat, lon, radius_m, lat_ref, points=72):
     path = []
-    for angle in angles:
-        north = radius_m * math.sin(angle)
-        east = radius_m * math.cos(angle)
-        dlat, dlon = meters_to_latlon_offset(north, east, lat_mean)
-        path.append([center_lon + dlon, center_lat + dlat])
+    for idx in range(points + 1):
+        theta = 2 * math.pi * idx / points
+        d_north = radius_m * math.cos(theta)
+        d_east = radius_m * math.sin(theta)
+        dlat, dlon = meters_to_latlon_offset(d_north, d_east, lat_ref)
+        path.append([lon + dlon, lat + dlat])
     return path
 
 
-def _spotlight_device_rows(df):
-    rows = []
-    for _, row in df.iterrows():
-        severity_label, severity_color = severity(float(row.risk), None)
-        rows.append(
-            "<div style='display:flex;align-items:center;gap:0.45rem;margin:0.2rem 0;'>"
-            f"<span style='display:inline-block;width:0.65rem;height:0.65rem;border-radius:999px;background:{severity_color};'></span>"
-            f"<span><strong>{row.device_id}</strong> · risk {row.risk:.2f} · {severity_label}</span>"
-            "</div>"
-        )
-    return rows
-
-
-def _scenario_spotlight(df_map, scenario):
-    if df_map is None or len(df_map) == 0 or scenario == "Normal":
+def _spotlight_target(df_map, scenario):
+    if df_map is None or df_map.empty:
         return None
 
     if scenario.startswith("Jamming"):
-        center = st.session_state.jammer
-        radius_m = CFG.jam_radius_m
-        label = "jammer zone"
-    elif scenario.startswith("Access Breach"):
-        center = st.session_state.rogue
-        radius_m = CFG.breach_radius_m
-        label = "rogue access zone"
-    elif scenario.startswith("GPS Spoofing"):
-        center = st.session_state.spoofer
-        radius_m = CFG.spoof_radius_m
-        label = "spoofing zone"
-    elif scenario.startswith("Data Tamper"):
-        gateway_df = df_map[df_map["type"] == "Gateway"].copy()
-        gateways = int(len(gateway_df))
-        hot_gateways = int((gateway_df["risk"] >= CFG.threshold).sum())
-        top_gateways = gateway_df.sort_values(["risk", "device_id"], ascending=[False, True]).head(3)
         return {
-            "title": "Gateway-side tamper path",
-            "message": f"This scenario targets gateway or payload-integrity behavior. Watch the {gateways} gateway device(s), with {hot_gateways} currently above the incident threshold.",
-            "devices": _spotlight_device_rows(top_gateways),
+            "title": "Jamming hotspot",
+            "center": st.session_state.get("jammer"),
+            "radius_m": CFG.jam_radius_m,
+            "message": "Devices in the interference radius should trend toward lower signal quality and higher loss.",
         }
-    else:
+    if scenario.startswith("Access Breach"):
+        return {
+            "title": "Access breach hotspot",
+            "center": st.session_state.get("rogue"),
+            "radius_m": CFG.breach_radius_m,
+            "message": "Devices nearest the rogue infrastructure usually surface first in the triage queue.",
+        }
+    if scenario.startswith("GPS Spoofing"):
+        return {
+            "title": "Spoofing hotspot",
+            "center": st.session_state.get("spoofer"),
+            "radius_m": CFG.spoof_radius_m,
+            "message": "Mobile assets in the spoofing radius should show elevated position error and navigation drift.",
+        }
+    if scenario.startswith("Data Tamper"):
+        gateways = df_map[df_map["type"].eq("Gateway")].copy()
+        if gateways.empty:
+            return None
+        return {
+            "title": "Gateway integrity watch",
+            "subset": gateways.sort_values("risk", ascending=False).head(5),
+            "message": "Gateway integrity issues typically concentrate on the relay path before spreading into downstream alerts.",
+        }
+    return None
+
+
+def _scenario_spotlight(df_map, scenario):
+    target = _spotlight_target(df_map, scenario)
+    if not target:
         return None
 
-    distances = np.array([haversine_m(row.lat, row.lon, center["lat"], center["lon"]) for row in df_map.itertuples(index=False)])
-    zone_df = df_map.loc[distances <= radius_m].copy()
-    in_zone = int(len(zone_df))
-    hot_in_zone = int((zone_df["risk"] >= CFG.threshold).sum())
-    top_zone = zone_df.sort_values(["risk", "device_id"], ascending=[False, True]).head(3)
+    subset = target.get("subset")
+    center = target.get("center")
+    radius_m = target.get("radius_m")
+    if subset is None and center and radius_m:
+        subset = df_map.copy()
+        subset["distance_m"] = subset.apply(
+            lambda row: haversine_m(row["lat"], row["lon"], center["lat"], center["lon"]),
+            axis=1,
+        )
+        subset = subset[subset["distance_m"] <= radius_m].sort_values(["risk", "distance_m"], ascending=[False, True])
+
+    if subset is None or subset.empty:
+        subset = df_map.sort_values("risk", ascending=False).head(5)
+        if subset.empty:
+            return None
+
+    mean_risk = float(subset["risk"].mean()) if "risk" in subset else 0.0
+    top_devices = [
+        f"<span class='quick-chip'>{row.device_id} · {row.risk:.2f}</span>"
+        for row in subset.head(4).itertuples()
+    ]
     return {
-        "title": f"Active {label}",
-        "message": f"{in_zone} device(s) are currently inside the scenario radius, with {hot_in_zone} already above the incident threshold.",
-        "devices": _spotlight_device_rows(top_zone),
+        "title": target["title"],
+        "message": f"{target['message']} {len(subset)} device(s) are currently in focus with average live risk {mean_risk:.2f}.",
+        "devices": top_devices,
     }
 
 
-def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
+def _paced_interval(refresh_interval, minimum_seconds):
+    if not refresh_interval:
+        return None
+    return max(float(refresh_interval), float(minimum_seconds))
+
+
+def _build_overview_map_df(type_filter):
+    latest_probs = st.session_state.get("latest_probs", {})
+    if st.session_state.get("model") is None:
+        return None
+
+    df_map = st.session_state.devices.copy()
+    if type_filter and len(type_filter) < len(DEVICE_TYPES):
+        df_map = df_map[df_map["type"].isin(type_filter)].copy()
+    df_map["risk"] = df_map["device_id"].map(latest_probs).fillna(0.0)
+    return df_map
+
+
+def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, refresh_interval=None):
     render_tab_intro("Overview", role)
     render_scenario_context(scenario)
     render_section_card(
         "Live operational picture",
-        "Use the map, fleet trends, and queue summary together: the left side shows where the pattern is emerging, while the right side shows how the system prioritizes response.",
+        "Use the map, fleet trends, and queue summary together: the left side shows where the pattern is forming, while the right side shows how response is prioritized.",
         kicker="Live posture",
     )
 
-    df_map = None
-    current_tick = int(st.session_state.get("tick", 0))
-    latest_probs = st.session_state.get("latest_probs", {})
-    incident_count = len(st.session_state.get("incidents", []))
-    active_alerts = sum(prob >= CFG.threshold for prob in latest_probs.values())
-    elevated_risk = sum(prob >= 0.70 for prob in latest_probs.values())
-    top_device, top_prob = (max(latest_probs.items(), key=lambda item: item[1]) if latest_probs else ("—", 0.0))
+    summary_interval = _paced_interval(refresh_interval, 1.0)
+    visual_interval = _paced_interval(refresh_interval, 2.4)
 
-    if st.session_state.get("model") is not None:
-        df_map = st.session_state.devices.copy()
-        if type_filter and len(type_filter) < len(DEVICE_TYPES):
-            df_map = df_map[df_map["type"].isin(type_filter)].copy()
-        df_map["risk"] = df_map["device_id"].map(latest_probs).fillna(0.0)
+    def _render_overview_status_content():
+        current_tick = int(st.session_state.get("tick", 0))
+        latest_probs = st.session_state.get("latest_probs", {})
+        incident_count = len(st.session_state.get("incidents", []))
+        active_alerts = sum(prob >= CFG.threshold for prob in latest_probs.values())
+        elevated_risk = sum(prob >= 0.70 for prob in latest_probs.values())
+        top_device, top_prob = (max(latest_probs.items(), key=lambda item: item[1]) if latest_probs else ("—", 0.0))
 
-    with st.container(border=True):
-        snapshot_cols = st.columns(4)
-        snapshot_cols[0].metric("Current tick", current_tick)
-        snapshot_cols[1].metric("Devices above threshold", active_alerts)
-        snapshot_cols[2].metric("Elevated-risk devices", elevated_risk)
-        snapshot_cols[3].metric("Top live risk", f"{top_device} · {top_prob:.2f}" if latest_probs else "Waiting for telemetry")
-        if current_tick < CFG.rolling_len:
-            st.caption(f"Warm-up in progress: the detector needs about {CFG.rolling_len} ticks of rolling history before live incidents can appear.")
-        elif incident_count > 0:
-            st.caption(f"Session status: {incident_count} incident(s) have already been generated in this run.")
+        with st.container(border=True):
+            snapshot_cols = st.columns(4)
+            snapshot_cols[0].metric("Current tick", current_tick)
+            snapshot_cols[1].metric("Devices above threshold", active_alerts)
+            snapshot_cols[2].metric("Elevated-risk devices", elevated_risk)
+            snapshot_cols[3].metric("Top live risk", f"{top_device} · {top_prob:.2f}" if latest_probs else "Waiting for telemetry")
+            if current_tick < CFG.rolling_len:
+                st.caption(f"Warm-up in progress: the detector needs about {CFG.rolling_len} ticks before incidents appear.")
+            elif incident_count > 0:
+                st.caption(f"Session status: {incident_count} incident(s) generated so far.")
 
-    left, right = st.columns([2, 1])
+    def _render_overview_left_content():
+        df_map = _build_overview_map_df(type_filter)
 
-    with left:
         with st.container(border=True):
             st.caption("Geospatial view")
             st.markdown("#### Fleet map and scenario overlays")
+
         if not show_map:
-            render_focus_callout("Map hidden", "Enable geospatial map in the sidebar to visualize devices and scenario radius overlays.")
-        elif st.session_state.get("model") is not None:
+            render_focus_callout("Map hidden", "Enable the geospatial map in the sidebar to see devices and scenario overlays.")
+        elif st.session_state.get("model") is not None and df_map is not None:
             latest_device_metrics = {
                 device_id: (buf[-1] if buf and len(buf) > 0 else {})
                 for device_id, buf in st.session_state.dev_buf.items()
@@ -294,12 +318,12 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
                     "- **Colored radius overlays**: active scenario coverage zone"
                 )
         else:
-            render_focus_callout("Model setup needed", "Run model setup to unlock the live map, risk overlays, and anomaly timeline charts.", variant="warning")
+            render_focus_callout("Model setup needed", "Run model setup to unlock the live map, risk overlays, and trend charts.", variant="warning")
 
         fleet_records = pd.DataFrame(list(st.session_state.fleet_records))
         render_section_card(
             "Fleet trends",
-            "These charts show how average fleet telemetry moves over time, which helps connect local incidents to broader system behavior.",
+            "These charts show how average fleet telemetry changes over time, helping connect local incidents to broader system behavior.",
             kicker="Trend view",
         )
         if len(fleet_records) > 0:
@@ -318,9 +342,13 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
                             key=f"overview_{y_axis}",
                         )
         else:
-            st.caption("Telemetry charts will populate once the stream begins collecting fleet samples.")
+            st.caption("Telemetry charts will populate once the stream starts collecting fleet samples.")
 
-    with right:
+    def _render_overview_right_content():
+        df_map = _build_overview_map_df(type_filter)
+        latest_probs = st.session_state.get("latest_probs", {})
+        active_alerts = sum(prob >= CFG.threshold for prob in latest_probs.values())
+
         spotlight = _scenario_spotlight(df_map, scenario)
         if spotlight:
             with st.container(border=True):
@@ -337,7 +365,7 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
 
         render_section_card(
             "Queue controls",
-            "This column summarizes how human oversight and queue ranking change the order in which operators should inspect devices.",
+            "This column shows how human oversight and queue ranking affect inspection order.",
             kicker="Response focus",
         )
         policy = current_hitl_policy()
@@ -381,7 +409,37 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
         if leaderboard:
             with st.container(border=True):
                 st.markdown("#### Triage queue")
-                st.caption("Escalated devices are boosted to the top; recently false-positive devices can be suppressed from the incident stream.")
+                st.caption("Escalated devices move to the top; recent false positives can be suppressed.")
                 st.dataframe(pd.DataFrame(leaderboard).sort_values(["queue_score", "prob"], ascending=False).head(10), width="stretch")
         else:
-            render_focus_callout("No queue yet", "Start playback or run model setup first to generate live risk rankings.")
+            render_focus_callout("No queue yet", "Start playback or run model setup to generate live risk rankings.")
+
+    if summary_interval:
+        @st.fragment(run_every=summary_interval)
+        def _render_overview_status_fragment():
+            _render_overview_status_content()
+
+        _render_overview_status_fragment()
+    else:
+        _render_overview_status_content()
+
+    left, right = st.columns([2, 1])
+    with left:
+        if visual_interval:
+            @st.fragment(run_every=visual_interval)
+            def _render_overview_left_fragment():
+                _render_overview_left_content()
+
+            _render_overview_left_fragment()
+        else:
+            _render_overview_left_content()
+
+    with right:
+        if summary_interval:
+            @st.fragment(run_every=summary_interval)
+            def _render_overview_right_fragment():
+                _render_overview_right_content()
+
+            _render_overview_right_fragment()
+        else:
+            _render_overview_right_content()

@@ -81,7 +81,7 @@ def _open_home_destination(tab_name: str, message: str):
 def _render_attack_academy_home(role, scenario):
     render_section_card(
         "Understand the current scenario",
-        "Use this section to explain what the selected attack means, why it matters, and what viewers should expect to see in the rest of the demo.",
+        "Use this section to explain what the selected attack means, why it matters, and what viewers should expect next.",
         kicker="Attack Academy",
     )
     render_current_attack_brief(scenario, role, title="Current scenario explainer")
@@ -108,7 +108,7 @@ def _render_restart_onboarding_callout():
 def _render_explore_destinations():
     render_section_card(
         "Where to explore next",
-        "Once the audience understands the current scenario, choose one of these three routes to begin the walkthrough.",
+        "Once the scenario is clear, choose one of these three routes to begin the walkthrough.",
         kicker="Explore",
     )
     path_cols = st.columns(len(QUICK_PATHS))
@@ -124,7 +124,7 @@ def _render_explore_destinations():
 def _render_customize_walkthrough(role, scenario):
     render_section_card(
         "Set scenario and audience",
-        "Adjust the scenario and audience framing here before you move into the deeper tabs.",
+        "Adjust the scenario and audience framing here before moving into the deeper tabs.",
         kicker="Customize",
     )
     scenario_options = [name for _, name, _ in SCENARIO_BUTTONS]
@@ -157,7 +157,7 @@ def _render_customize_walkthrough(role, scenario):
 def _render_setup_status():
     render_section_card(
         "Model setup status",
-        "Keep setup visible here so you can quickly explain whether the demo is ready or refresh the models when needed.",
+        "Keep setup visible here so you can quickly show whether the demo is ready or refresh the models when needed.",
         kicker="System readiness",
     )
     render_model_status_card(compact=False)
