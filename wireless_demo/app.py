@@ -37,57 +37,59 @@ def _apply_pending_home_actions():
         st.session_state.role_selector_preview = pending_role
 
 
-def _render_first_open_welcome():
-    def render_prompt_body():
-        render_onboarding_panel(
-            title="Welcome to the demo",
-            body="Start with the Home tab to pick a scenario, choose an audience view, and understand the demo story before opening the detailed workspaces.",
-            bullets=[
-                "Home guides scenario selection, audience mode, and next-step navigation.",
-                "Overview shows live wireless posture and fleet risk.",
-                "Incidents supports alert triage and human review actions.",
-                "Insights and Governance explain model behavior and trust controls.",
-            ],
-            kicker="Getting started",
-            variant="info",
-        )
-        cols = st.columns(2)
-        if cols[0].button("Got it", key="welcome_dismiss", use_container_width=True):
-            st.session_state.welcome_prompt_dismissed = True
-            st.rerun()
-        if cols[1].button("Open model setup guide", key="welcome_open_setup", use_container_width=True):
-            st.session_state.welcome_prompt_dismissed = True
-            st.session_state.training_prompt_dismissed = False
-            st.rerun()
+@st.dialog("Welcome to the demo")
+def _render_first_open_welcome_dialog():
+    render_onboarding_panel(
+        title="Start here",
+        body="Use the Home page first to understand the story of the demo before opening the detailed workspaces.",
+        bullets=[
+            "Home explains what the demo is, which models it uses, and what is included.",
+            "Overview shows live wireless posture and fleet risk.",
+            "Incidents supports alert triage and human review actions.",
+            "Insights and Governance explain model behavior and trust controls.",
+        ],
+        kicker="Getting started",
+        variant="info",
+    )
+    cols = st.columns(2)
+    if cols[0].button("Got it", key="welcome_dismiss", use_container_width=True):
+        st.session_state.welcome_prompt_dismissed = True
+        st.rerun()
+    if cols[1].button("Open model setup guide", key="welcome_open_setup", use_container_width=True):
+        st.session_state.welcome_prompt_dismissed = True
+        st.session_state.training_prompt_dismissed = False
+        st.rerun()
 
-    with st.container():
-        render_prompt_body()
+
+def _render_first_open_welcome():
+    _render_first_open_welcome_dialog()
+
+
+@st.dialog("Model setup guide")
+def _render_initial_training_prompt_dialog():
+    render_onboarding_panel(
+        title="Open model setup guide",
+        body="This demo needs its anomaly detector and attack-type classifier before it can generate alerts, explanations, and transparency views.",
+        bullets=[
+            "Binary detector learns normal vs anomalous device behavior.",
+            "Attack typing learns Jamming, Breach, Spoofing, and Tamper classification.",
+            "Transparency views unlock global importance, calibration, and governance context after training.",
+        ],
+        kicker="Setup required",
+        variant="warning",
+    )
+    action_cols = st.columns(2)
+    if action_cols[0].button("Start model setup", key="initial_train_now", use_container_width=True):
+        st.session_state.training_prompt_dismissed = True
+        train_model_with_progress(n_ticks=350)
+        st.rerun()
+    if action_cols[1].button("Skip for now", key="initial_train_later", use_container_width=True):
+        st.session_state.training_prompt_dismissed = True
+        st.rerun()
 
 
 def _render_initial_training_prompt():
-    def render_prompt_body():
-        render_onboarding_panel(
-            title="Open model setup guide",
-            body="This demo needs its anomaly detector and attack-type classifier before it can generate alerts, explanations, and transparency views.",
-            bullets=[
-                "Binary detector learns normal vs anomalous device behavior.",
-                "Attack typing learns Jamming, Breach, Spoofing, and Tamper classification.",
-                "Transparency views unlock global importance, calibration, and governance context after training.",
-            ],
-            kicker="Setup required",
-            variant="warning",
-        )
-        action_cols = st.columns(2)
-        if action_cols[0].button("Start model setup", key="initial_train_now", use_container_width=True):
-            st.session_state.training_prompt_dismissed = True
-            train_model_with_progress(n_ticks=350)
-            st.rerun()
-        if action_cols[1].button("Skip for now", key="initial_train_later", use_container_width=True):
-            st.session_state.training_prompt_dismissed = True
-            st.rerun()
-
-    with st.container():
-        render_prompt_body()
+    _render_initial_training_prompt_dialog()
 
 
 def _render_primary_navigation(tab_order):

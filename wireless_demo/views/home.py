@@ -1,6 +1,3 @@
-from contextlib import nullcontext
-
-import numpy as np
 import streamlit as st
 
 from ..attack_education import render_attack_academy
@@ -8,14 +5,9 @@ from ..training import train_model_with_progress
 from ..ux import (
     SCENARIO_COPY,
     icon_badge_html,
-    metric_role_copy,
-    render_demo_storyline,
-    render_header,
     render_model_status_card,
     render_quickstart,
-    render_role_flow_hint,
     render_section_card,
-    render_tab_intro,
 )
 
 
@@ -182,6 +174,12 @@ def _render_project_summary_grid():
             )
 
 
+def _open_home_destination(tab_name: str, message: str):
+    st.session_state.active_primary_tab = tab_name
+    st.session_state.home_message = message
+    st.rerun()
+
+
 def _render_presentation_overview(role, scenario, profile):
     scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
     role_copy = ROLE_HOME_COPY.get(role, ROLE_HOME_COPY["End User"])
@@ -244,74 +242,113 @@ def _render_presentation_overview(role, scenario, profile):
     )
 
 
-def _section_container(title, compact_mode, expanded=False):
-    if compact_mode:
-        return st.expander(title, expanded=expanded)
-    st.markdown(f"### {title}")
-    return nullcontext()
+def _render_workflow_overview():
+    render_section_card(
+        "How the demo works",
+        "A simple three-step story for first-time users: detect suspicious behavior, explain the likely threat, and keep a human in control of the outcome.",
+        kicker="Workflow",
+    )
+    workflow_cols = st.columns(3)
+    with workflow_cols[0]:
+        _render_card("step_1", "Detect anomaly", "The first model scores whether recent telemetry looks suspicious.")
+    with workflow_cols[1]:
+        _render_card("step_2", "Explain threat", "A second stage estimates the likely threat family using model output plus rules.")
+    with workflow_cols[2]:
+        _render_card("step_3", "Send to review", "Human reviewers approve, dismiss, or escalate the alert with traceable oversight.")
+
+
+def _render_explore_destinations():
+    render_section_card(
+        "Where to explore next",
+        "Use these four entry points when you want to move from the Home overview into the part of the demo that best matches your audience or presentation goal.",
+        kicker="Explore",
+    )
+    path_cols = st.columns(len(QUICK_PATHS))
+    for col, (icon, tab_name, copy, caption) in zip(path_cols, QUICK_PATHS):
+        with col:
+            _render_icon_tile(icon, tab_name, copy, caption=caption)
+            if st.button(f"Open {tab_name}", key=f"home_open_{tab_name}", use_container_width=True):
+                _open_home_destination(tab_name, f"Opened {tab_name}. Use the guidance in that tab to continue the walkthrough.")
+
+
+def _render_customize_walkthrough(role, scenario):
+    render_section_card(
+        "Customize the walkthrough",
+        "Adjust the scenario and audience framing here when you want the Home page to match the people in front of you before moving into the deeper tabs.",
+        kicker="Customize",
+    )
+    scenario_options = [name for _, name, _ in SCENARIO_BUTTONS]
+    role_options = [name for _, name, _ in ROLE_BUTTONS]
+    control_cols = st.columns(2)
+    selected_scenario = control_cols[0].selectbox(
+        "Scenario",
+        scenario_options,
+        index=scenario_options.index(scenario) if scenario in scenario_options else 0,
+        key="home_selected_scenario",
+    )
+    selected_role = control_cols[1].selectbox(
+        "Audience view",
+        role_options,
+        index=role_options.index(role) if role in role_options else 0,
+        key="home_selected_role",
+    )
+    action_cols = st.columns([1, 1.2, 1.2])
+    if action_cols[0].button("Apply selections", key="home_apply_selection", use_container_width=True):
+        st.session_state.pending_home_scenario = selected_scenario
+        st.session_state.pending_home_role = selected_role
+        st.session_state.home_message = f"Home walkthrough updated for {selected_role} under {selected_scenario}."
+        st.rerun()
+    if action_cols[1].button("Open live monitoring", key="home_open_overview", use_container_width=True):
+        _open_home_destination("Overview", "Opened Overview. Start with the live posture and risk picture.")
+    if action_cols[2].button("Open incident triage", key="home_open_incidents", use_container_width=True):
+        _open_home_destination("Incidents", "Opened Incidents. Review the queue and evidence next.")
+
+
+def _render_home_snapshot():
+    metrics = st.session_state.get("metrics") or {}
+    probs = list(st.session_state.get("latest_probs", {}).values())
+    train_secs = st.session_state.get("last_train_secs")
+    snapshot_cols = st.columns(4)
+    snapshot_cols[0].metric("Devices", len(st.session_state.devices))
+    snapshot_cols[1].metric("Incidents", len(st.session_state.incidents))
+    snapshot_cols[2].metric("AUC", f"{metrics.get('auc', 0.0):.2f}")
+    snapshot_cols[3].metric("Avg risk", f"{(sum(probs) / len(probs)):.2f}" if probs else "0.00")
+    if train_secs:
+        st.caption(f"Latest setup completed in {int(train_secs)}s.")
 
 
 def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
-    render_header(profile, scenario, role)
-    render_quickstart(help_mode, show_eu_status, scenario)
     _render_project_banner(role, scenario, profile)
     _render_presentation_overview(role, scenario, profile)
-    render_demo_storyline(
-        model_ready=st.session_state.get("model") is not None,
-        incident_count=len(st.session_state.get("incidents", [])),
-        scenario=scenario,
-    )
-
-    metric_copy = metric_role_copy(role)
-    metric_keys = {
-        "devices": metric_copy["devices"],
-        "incidents": metric_copy["incidents"],
-        "quality": metric_copy["quality"],
-        "risk": metric_copy["risk"],
-        "train": metric_copy["train"],
-    }
-    probs = list(st.session_state.latest_probs.values())
-    metrics = st.session_state.get("metrics") or {}
-    train_secs = st.session_state.get("last_train_secs")
-
-    render_section_card(
-        "Demo snapshot",
-        "These high-level metrics summarize current scale, alert load, model quality, and refresh status.",
-        kicker="At a glance",
-    )
-    with st.container(border=True):
-        k1, k2, k3, k4, k5 = st.columns(5)
-        with k1:
-            st.metric(metric_keys["devices"][0], len(st.session_state.devices), help=metric_keys["devices"][1])
-        with k2:
-            st.metric(metric_keys["incidents"][0], len(st.session_state.incidents), help=metric_keys["incidents"][1])
-        with k3:
-            st.metric(metric_keys["quality"][0], f"{metrics.get('auc', 0.0):.2f}", help=metric_keys["quality"][1])
-        with k4:
-            st.metric(metric_keys["risk"][0], f"{(np.mean(probs) if probs else 0):.2f}", help=metric_keys["risk"][1])
-        with k5:
-            st.metric(metric_keys["train"][0], f"{int(train_secs)}s" if train_secs else "—", help=metric_keys["train"][1])
-
-    render_role_flow_hint(role)
-    render_tab_intro("Home", role)
-
-    mode_cols = st.columns([1.2, 3])
-    compact_mode = mode_cols[0].toggle("Compact Home", value=True, key="home_compact_mode")
-    mode_cols[1].caption(
-        "Compact mode collapses the Home sections for faster scanning. Turn it off for the full walkthrough on one page."
-    )
+    _render_workflow_overview()
+    _render_explore_destinations()
+    _render_customize_walkthrough(role, scenario)
 
     scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
 
-    with _section_container("Model status", compact_mode, expanded=st.session_state.get("model") is not None):
+    with st.expander("Model and setup", expanded=st.session_state.get("model") is None):
         render_section_card(
             "Model status",
-            "Check whether the detector is ready, whether artifacts were loaded from cache or fresh training, and whether the app is prepared for the live monitoring workflow.",
+            "Check whether the detector is ready, whether artifacts were loaded from cache or fresh training, and whether the app is prepared for live monitoring.",
             kicker="System readiness",
         )
         render_model_status_card(compact=False)
+        setup_cols = st.columns([1, 2])
+        with setup_cols[0]:
+            if st.button("Run model setup", key="home_train_model", use_container_width=True):
+                st.session_state.training_prompt_dismissed = True
+                train_model_with_progress(n_ticks=350)
+                st.session_state.home_message = "Model setup completed. You can now use the live monitoring tabs."
+                st.rerun()
+        with setup_cols[1]:
+            with st.container(border=True):
+                st.markdown(
+                    "- **Anomaly detector**: LightGBM binary classifier.  \n"
+                    "- **Threat typing**: LightGBM multiclass model + rules.  \n"
+                    "- **Confidence controls**: thresholding + conformal calibration."
+                )
 
-    with _section_container("Learn the attacks", compact_mode, expanded=False):
+    with st.expander("Attack scenarios", expanded=False):
         render_section_card(
             "Learn the attacks",
             "This section explains each scenario in plain language first, then gives the technical cues that the rest of the demo will surface.",
@@ -319,7 +356,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         )
         render_attack_academy(role, selected_scenario=scenario)
 
-    with _section_container("About this demo", compact_mode, expanded=True):
+    with st.expander("Technical background", expanded=False):
         render_section_card(
             "About this demo",
             "Use this summary when you want a short explanation of what the demo does, how the model stack works, and what is included.",
@@ -344,8 +381,17 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
                 "Data Tamper (gateway)": "tamper",
             }.get(scenario, "scenario")
             _render_card(scenario_icon, scenario, scenario_copy["summary"], chip=f"Includes: monitoring, triage, transparency, governance")
+        render_section_card(
+            "Current demo snapshot",
+            "This quick snapshot is useful once you already understand the demo and want a compact readout of the current session state.",
+            kicker="Snapshot",
+        )
+        with st.container(border=True):
+            _render_home_snapshot()
+        with st.container(border=True):
+            render_quickstart(help_mode, show_eu_status, scenario)
 
-    with _section_container("Start here", compact_mode, expanded=not st.session_state.get("model") is not None):
+    with st.expander("Optional guided onboarding", expanded=False):
         render_section_card(
             "Start here",
             "This three-step path gives any audience a quick way to begin the demo without needing to understand the full interface first.",
@@ -359,66 +405,6 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
             _render_card("step_2", "Pick a view", "Switch the explanation style for the audience in front of you.")
         with explainer_cols[2]:
             _render_card("step_3", "Open a tab", "Go to Overview, Incidents, Insights, or Governance next.")
-
-    with _section_container("Quick scenario selection", compact_mode):
-        render_section_card(
-            "Quick scenario selection",
-            "Choose the threat story you want to demonstrate. Each button changes the operational narrative for the rest of the app.",
-            kicker="Scenario picker",
-        )
-        scenario_cols = st.columns(len(SCENARIO_BUTTONS))
-        for col, (icon, scenario_name, caption) in zip(scenario_cols, SCENARIO_BUTTONS):
-            with col:
-                _render_icon_tile(icon, scenario_name, SCENARIO_COPY[scenario_name]["summary"], caption=caption)
-                if st.button("Choose", key=f"home_scenario_{scenario_name}", use_container_width=True):
-                    st.session_state.pending_home_scenario = scenario_name
-                    st.session_state.home_message = f"Scenario set to {scenario_name}. Open Overview or Incidents next."
-                    st.rerun()
-
-    with _section_container("Choose your audience view", compact_mode):
-        render_section_card(
-            "Choose your audience view",
-            "Switch the narrative framing for the person in front of you without changing the underlying demo behavior.",
-            kicker="Audience mode",
-        )
-        role_cols = st.columns(len(ROLE_BUTTONS))
-        for col, (icon, role_name, caption) in zip(role_cols, ROLE_BUTTONS):
-            with col:
-                _render_icon_tile(icon, role_name, ROLE_HOME_COPY[role_name]["headline"], caption=caption)
-                if st.button("Use view", key=f"home_role_{role_name}", use_container_width=True):
-                    st.session_state.pending_home_role = role_name
-                    st.session_state.home_message = f"Viewer role changed to {role_name}. The guidance across the demo has been updated."
-                    st.rerun()
-
-    with _section_container("Explore the demo", compact_mode):
-        render_section_card(
-            "Explore the demo",
-            "Use these quick paths when you already know which part of the story you want to show next: live posture, incidents, explanation, or trust controls.",
-            kicker="Navigation",
-        )
-        path_cols = st.columns(len(QUICK_PATHS))
-        for col, (icon, tab_name, copy, caption) in zip(path_cols, QUICK_PATHS):
-            with col:
-                _render_icon_tile(icon, tab_name, copy, caption=caption)
-                if st.button("Go next", key=f"home_path_{tab_name}", use_container_width=True):
-                    st.session_state.home_message = f"Next step: open the {tab_name} tab."
-
-    with _section_container("Model setup", compact_mode):
-        render_section_card(
-            "Model setup",
-            "Run setup when you want fresh model artifacts, updated thresholds, and the full transparency workflow enabled across the demo.",
-            kicker="Setup",
-        )
-        setup_cols = st.columns([1, 2])
-        with setup_cols[0]:
-            if st.button("Run model setup", key="home_train_model", use_container_width=True):
-                st.session_state.training_prompt_dismissed = True
-                train_model_with_progress(n_ticks=350)
-                st.session_state.home_message = "Model setup completed. You can now use the live monitoring tabs."
-                st.rerun()
-        with setup_cols[1]:
-            with st.container(border=True):
-                st.info("Run model setup when you want fresh model artifacts, updated thresholds, and full transparency views.")
 
     if st.session_state.get("home_message"):
         st.success(st.session_state.home_message)
