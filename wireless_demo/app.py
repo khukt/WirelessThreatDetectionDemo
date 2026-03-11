@@ -38,6 +38,15 @@ ONBOARDING_SCENARIOS = [
 ]
 
 ONBOARDING_ROLES = ["End User", "Domain Expert", "Regulator", "AI Builder", "Executive"]
+ONBOARDING_TOTAL_STEPS = 6
+ONBOARDING_STEP_TITLES = {
+    1: "Intro",
+    2: "Context",
+    3: "Models",
+    4: "Included",
+    5: "Workflow",
+    6: "Next",
+}
 
 
 def _apply_pending_home_actions():
@@ -81,6 +90,9 @@ def _render_first_open_welcome_dialog():
     step = st.session_state.get("onboarding_step", 1)
     st.session_state.setdefault("onboarding_scenario", st.session_state.get("scenario_selector", "Normal"))
     st.session_state.setdefault("onboarding_role", st.session_state.get("role_selector_preview", "AI Builder"))
+    step_title = ONBOARDING_STEP_TITLES.get(step, "Onboarding")
+    st.caption(f"Slide {step} of {ONBOARDING_TOTAL_STEPS} · {step_title}")
+    st.progress(step / ONBOARDING_TOTAL_STEPS)
 
     if step == 1:
         render_onboarding_panel(
@@ -125,19 +137,19 @@ def _render_first_open_welcome_dialog():
             st.session_state.onboarding_scenario = "Normal"
             st.session_state.onboarding_role = "AI Builder"
             st.rerun()
-        if cols[2].button("See the workflow", key="onboarding_next_step2", use_container_width=True):
+        if cols[2].button("See the model story", key="onboarding_next_step2", use_container_width=True):
             st.session_state.onboarding_step = 3
             st.rerun()
         return
 
     if step == 3:
         render_onboarding_panel(
-            title="How the demo works",
-            body="The workflow is intentionally simple for first-time users.",
+            title="What models are used",
+            body="The demo uses a staged AI workflow rather than a single black-box score.",
             bullets=[
-                "Detect anomaly: a LightGBM model scores suspicious behavior from rolling telemetry features.",
-                "Explain likely threat: a second stage combines multiclass prediction with domain rules.",
-                "Send to review: humans approve, dismiss, or escalate alerts with auditability.",
+                "Stage 1: a LightGBM anomaly detector scores suspicious behavior from rolling telemetry features.",
+                "Stage 2: threat typing combines multiclass prediction with domain rules for Jamming, Breach, Spoofing, and Tamper.",
+                "Confidence controls and human review keep the final outcome explainable and accountable.",
             ],
             kicker="Step 3",
             variant="info",
@@ -146,8 +158,50 @@ def _render_first_open_welcome_dialog():
         if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True):
             st.session_state.onboarding_step = 2
             st.rerun()
-        if cols[1].button("Choose a starting view", key="onboarding_next_step3", use_container_width=True):
+        if cols[1].button("See what is included", key="onboarding_next_step3", use_container_width=True):
             st.session_state.onboarding_step = 4
+            st.rerun()
+        return
+
+    if step == 4:
+        render_onboarding_panel(
+            title="What is included",
+            body="The app is designed to tell both the operational story and the trust story from one place.",
+            bullets=[
+                "Live monitoring for posture, risk, map context, and fleet behavior.",
+                "Incident triage for evidence review, approval, dismissal, or escalation.",
+                "Transparency and governance views for calibration, feature importance, auditability, and oversight framing.",
+            ],
+            kicker="Step 4",
+            variant="info",
+        )
+        cols = st.columns([1, 1])
+        if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True):
+            st.session_state.onboarding_step = 3
+            st.rerun()
+        if cols[1].button("See the workflow", key="onboarding_next_step4", use_container_width=True):
+            st.session_state.onboarding_step = 5
+            st.rerun()
+        return
+
+    if step == 5:
+        render_onboarding_panel(
+            title="How the demo works",
+            body="The walkthrough is intentionally simple for first-time users.",
+            bullets=[
+                "Detect anomaly from recent telemetry.",
+                "Explain the likely threat family with model output plus rules.",
+                "Send the alert to human review with traceable oversight.",
+            ],
+            kicker="Step 5",
+            variant="info",
+        )
+        cols = st.columns([1, 1])
+        if cols[0].button("Back", key="onboarding_back_step5", use_container_width=True):
+            st.session_state.onboarding_step = 4
+            st.rerun()
+        if cols[1].button("Choose a starting view", key="onboarding_next_step5", use_container_width=True):
+            st.session_state.onboarding_step = 6
             st.rerun()
         return
 
@@ -155,16 +209,16 @@ def _render_first_open_welcome_dialog():
         title="Where to go next",
         body="Pick the best starting point for your session.",
         bullets=[
-            "Home gives the presentation overview.",
+            "Home gives the lightweight presentation overview and lets you adjust the audience and scenario.",
             "Overview shows live monitoring and fleet risk.",
             "Incidents, Insights, and Governance provide deeper operational and assurance views.",
         ],
-        kicker="Step 4",
+        kicker="Step 6",
         variant="info",
     )
     cols = st.columns([1, 1, 1, 1])
-    if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True):
-        st.session_state.onboarding_step = 3
+    if cols[0].button("Back", key="onboarding_back_step6", use_container_width=True):
+        st.session_state.onboarding_step = 5
         st.rerun()
     if cols[1].button("Home overview", key="onboarding_open_home", use_container_width=True):
         _close_onboarding(open_tab="Home")

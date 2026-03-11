@@ -181,57 +181,21 @@ def _open_home_destination(tab_name: str, message: str):
 
 
 def _render_presentation_overview(role, scenario, profile):
-    scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
     role_copy = ROLE_HOME_COPY.get(role, ROLE_HOME_COPY["End User"])
-    included_html = "".join(
-        [
-            f"<div class='home-include-item'><div class='home-include-title'>{title}</div><div class='home-include-copy'>{copy}</div></div>"
-            for title, copy in INCLUDED_CAPABILITIES
-        ]
-    )
-    stack_html = "".join(
-        [
-            f"<div class='home-stack-row'>{icon_badge_html(icon, 'sm')}<div><div class='home-stack-title'>{title}</div><div class='home-stack-copy'>{copy}</div></div></div>"
-            for icon, title, copy in MODEL_STACK
-        ]
-    )
     st.markdown(
         f"""
-        <div class='home-presentation-grid'>
-            <div class='home-presentation-card'>
-                <div class='home-presentation-kicker'>What this demo is</div>
-                <div class='home-presentation-title'>A trustworthy wireless threat detection showcase</div>
-                <div class='home-presentation-copy'>
-                    This demo shows how AI can monitor simulated wireless telemetry, surface suspicious behavior,
-                    label likely threat families, and keep humans accountable for the final decision.
-                </div>
-                <ul class='home-presentation-list'>
-                    <li>Built for presentations, research demos, teaching, and stakeholder briefings.</li>
-                    <li>Role-aware views make the same system understandable for operators, regulators, engineers, and executives.</li>
-                    <li>Current scenario: <strong>{scenario}</strong> · Profile: <strong>{profile}</strong> · Audience: <strong>{role}</strong>.</li>
-                    <li>Current storytelling cue: <strong>{scenario_copy['signals']}</strong>.</li>
-                </ul>
+        <div class='home-presentation-card'>
+            <div class='home-presentation-kicker'>Start here</div>
+            <div class='home-presentation-title'>A lighter Home page for live demos</div>
+            <div class='home-presentation-copy'>
+                Use the guided onboarding for the full story, then use this page to pick the right audience framing
+                and jump into monitoring, incidents, transparency, or governance.
             </div>
-            <div class='home-presentation-card'>
-                <div class='home-presentation-kicker'>What models we use</div>
-                <div class='home-presentation-title'>A two-stage detection and explanation stack</div>
-                <div class='home-presentation-copy'>
-                    The demo does not rely on a single black-box score. It combines anomaly detection, threat typing,
-                    confidence controls, and human review in one explainable workflow.
-                </div>
-                {stack_html}
-            </div>
-            <div class='home-presentation-card'>
-                <div class='home-presentation-kicker'>What is included</div>
-                <div class='home-presentation-title'>Everything needed for a guided walkthrough</div>
-                <div class='home-presentation-copy'>
-                    The app includes monitoring, review workflows, transparency views, and governance evidence,
-                    so you can explain both system behavior and trust controls from one place.
-                </div>
-                <div class='home-include-grid'>
-                    {included_html}
-                </div>
-            </div>
+            <ul class='home-presentation-list'>
+                <li>Use <strong>Restart guided onboarding</strong> whenever you want the slide-by-slide intro again.</li>
+                <li>Use the controls below to tailor the scenario and audience for the people in front of you.</li>
+                <li>Use the destination cards to move directly into the part of the demo you want to present next.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -240,21 +204,6 @@ def _render_presentation_overview(role, scenario, profile):
         f"<div class='home-hero'><div class='home-hero-title'>{role_copy['headline']}</div><div class='home-hero-copy'>{role_copy['body']}</div></div>",
         unsafe_allow_html=True,
     )
-
-
-def _render_workflow_overview():
-    render_section_card(
-        "How the demo works",
-        "A simple three-step story for first-time users: detect suspicious behavior, explain the likely threat, and keep a human in control of the outcome.",
-        kicker="Workflow",
-    )
-    workflow_cols = st.columns(3)
-    with workflow_cols[0]:
-        _render_card("step_1", "Detect anomaly", "The first model scores whether recent telemetry looks suspicious.")
-    with workflow_cols[1]:
-        _render_card("step_2", "Explain threat", "A second stage estimates the likely threat family using model output plus rules.")
-    with workflow_cols[2]:
-        _render_card("step_3", "Send to review", "Human reviewers approve, dismiss, or escalate the alert with traceable oversight.")
 
 
 def _render_restart_onboarding_callout():
@@ -339,7 +288,6 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     _render_project_banner(role, scenario, profile)
     _render_presentation_overview(role, scenario, profile)
     _render_restart_onboarding_callout()
-    _render_workflow_overview()
     _render_explore_destinations()
     _render_customize_walkthrough(role, scenario)
 
