@@ -26,6 +26,7 @@ from .views.fleet import render_fleet_tab
 from .views.governance import render_governance_tab
 from .views.home import render_home_tab
 from .views.incidents import render_incidents_tab
+from .views.insights import _stakeholder_architecture_figure
 from .views.insights import render_insights_tab
 from .views.overview import render_overview_tab
 
@@ -102,6 +103,34 @@ def _render_onboarding_progress(step: int):
 
 def _render_onboarding_action_hint(message: str):
     st.markdown(f"<div class='onboarding-actions-note'>{message}</div>", unsafe_allow_html=True)
+
+
+def _render_onboarding_model_architecture():
+    scale_pos_weight = st.session_state.get("training_info", {}).get("scale_pos_weight")
+    architecture_cols = st.columns([1.45, 1.0])
+    with architecture_cols[0]:
+        st.plotly_chart(
+            _stakeholder_architecture_figure(),
+            use_container_width=True,
+            config={"displayModeBar": False},
+            key=f"onboarding_arch_{st.session_state.get('ui_nonce', 'default')}",
+        )
+    with architecture_cols[1]:
+        with st.container(border=True):
+            st.caption("Model architecture")
+            st.markdown("#### What kind of LightGBM models are used")
+            st.markdown(
+                f"- **Detector type**: LightGBM binary classifier using gradient-boosted decision trees.  \n"
+                f"- **Detector objective**: anomaly probability for each telemetry window.  \n"
+                f"- **Detector shape**: `{CFG.n_estimators}` trees, max depth `{CFG.max_depth}`, learning rate `{CFG.learning_rate}`.  \n"
+                + (f"- **Class balancing**: scale-pos-weight `{scale_pos_weight:.2f}` for anomaly imbalance.  \n" if scale_pos_weight else "")
+                + "- **Type head**: LightGBM multiclass classifier plus domain rules for Jamming, Breach, Spoof, and Tamper.  \n"
+                "- **Type shape**: 80 trees, max depth 4, learning rate 0.08, followed by rule fusion and confidence checks."
+            )
+            st.caption(
+                "In plain language: this is an ensemble of many shallow decision trees boosted together, not a neural network. "
+                "One model decides whether behavior looks suspicious, and a second model helps explain what kind of threat it resembles."
+            )
 
 
 def _render_first_open_welcome():
@@ -188,6 +217,7 @@ def _render_first_open_welcome():
                 kicker="Step 3",
                 variant="info",
             )
+            _render_onboarding_model_architecture()
             _render_onboarding_action_hint("Continue to see which parts of the demo are included in the walkthrough.")
             cols = st.columns([1, 1])
             if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True, type="secondary"):

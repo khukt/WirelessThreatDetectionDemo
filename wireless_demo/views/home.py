@@ -1,5 +1,6 @@
 import streamlit as st
 
+from ..attack_education import render_attack_academy, render_current_attack_brief
 from ..training import train_model_with_progress
 from ..ux import (
     SCENARIO_COPY,
@@ -7,31 +8,6 @@ from ..ux import (
     render_model_status_card,
     render_section_card,
 )
-
-
-ROLE_HOME_COPY = {
-    "End User": {
-        "headline": "Start with the simplest view of the story.",
-        "body": "This demo shows how AI monitors wireless operations, flags suspicious behavior, and keeps people in charge of the final decision.",
-    },
-    "Domain Expert": {
-        "headline": "Start with the scenario and analyst workflow.",
-        "body": "This demo combines telemetry, anomaly detection, threat typing, and human review so you can judge whether the signals match operational reality.",
-    },
-    "Regulator": {
-        "headline": "Start with an assurance-first view.",
-        "body": "This demo shows not only AI outputs, but also the transparency, confidence controls, and human oversight around those outputs.",
-    },
-    "AI Builder": {
-        "headline": "Start by choosing the behavior you want to test.",
-        "body": "This demo covers the full loop from synthetic telemetry to anomaly scoring, threat typing, review actions, and governance evidence.",
-    },
-    "Executive": {
-        "headline": "Start with the business story.",
-        "body": "This demo explains how the system detects wireless threats, highlights operational risk, and shows where trust and accountability controls sit around the AI.",
-    },
-}
-
 
 QUICK_PATHS = [
     ("overview", "Overview", "Start with the live posture of the fleet and current risk pattern.", "Recommended first stop", True),
@@ -79,9 +55,9 @@ def _render_project_banner(role, scenario, profile):
         f"""
         <div class="home-project-shell">
             <div class="home-project-kicker">Home hub</div>
-            <div class="home-project-title">TRUST AI — Demo landing page</div>
+            <div class="home-project-title">TRUST AI — Scenario landing page</div>
             <div class="home-project-copy">
-                Use this page to set the scenario and audience, reopen the guided onboarding, and choose where to start the demo.
+                Use this page to understand the current threat scenario, align the audience, and then jump into the right part of the demo.
             </div>
             <div class="home-project-chip-row">
                 <span class="home-project-chip">Profile: {profile}</span>
@@ -102,29 +78,15 @@ def _open_home_destination(tab_name: str, message: str):
     st.rerun()
 
 
-def _render_presentation_overview(role, scenario, profile):
-    role_copy = ROLE_HOME_COPY.get(role, ROLE_HOME_COPY["End User"])
-    st.markdown(
-        f"""
-        <div class='home-presentation-card'>
-            <div class='home-presentation-kicker'>Recommended use</div>
-            <div class='home-presentation-title'>Use Home to orient and route</div>
-            <div class='home-presentation-copy'>
-                The guided onboarding now handles the full introduction. Home is kept intentionally light so you can quickly align the audience and jump into the right part of the demo.
-            </div>
-            <ul class='home-presentation-list'>
-                <li>Restart guided onboarding when you want the slide-by-slide intro again.</li>
-                <li>Set scenario and audience before moving into live tabs.</li>
-                <li>Choose one of the three destination cards below to start the walkthrough.</li>
-            </ul>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def _render_attack_academy_home(role, scenario):
+    render_section_card(
+        "Understand the current scenario",
+        "Use this section to explain what the selected attack means, why it matters, and what viewers should expect to see in the rest of the demo.",
+        kicker="Attack Academy",
     )
-    st.markdown(
-        f"<div class='home-hero'><div class='home-hero-title'>{role_copy['headline']}</div><div class='home-hero-copy'>{role_copy['body']}</div></div>",
-        unsafe_allow_html=True,
-    )
+    render_current_attack_brief(scenario, role, title="Current scenario explainer")
+    with st.expander("Compare all attack scenarios", expanded=False):
+        render_attack_academy(role, selected_scenario=scenario)
 
 
 def _render_restart_onboarding_callout():
@@ -148,7 +110,7 @@ def _render_restart_onboarding_callout():
 def _render_explore_destinations():
     render_section_card(
         "Where to explore next",
-        "Pick one of these three routes when you are ready to leave Home and begin the actual walkthrough.",
+        "Once the audience understands the current scenario, choose one of these three routes to begin the walkthrough.",
         kicker="Explore",
     )
     st.caption("Recommended path: start with Overview, then move to Incidents or Insights depending on whether you want operations or explanation next.")
@@ -220,11 +182,17 @@ def _render_setup_status():
 
 def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
     _render_project_banner(role, scenario, profile)
-    _render_presentation_overview(role, scenario, profile)
     _render_restart_onboarding_callout()
-    _render_explore_destinations()
-    _render_customize_walkthrough(role, scenario)
-    _render_setup_status()
+    _render_attack_academy_home(role, scenario)
+
+    lower_cols = st.columns([1.05, 1.25])
+    with lower_cols[0]:
+        _render_customize_walkthrough(role, scenario)
+    with lower_cols[1]:
+        _render_explore_destinations()
+
+    with st.expander("Model setup and readiness", expanded=st.session_state.get("model") is None):
+        _render_setup_status()
 
     if st.session_state.get("home_message"):
         st.success(st.session_state.home_message)
