@@ -488,6 +488,93 @@ def inject_global_styles():
             font-size: 0.88rem;
             line-height: 1.55;
         }
+        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"],
+        div[role="dialog"][aria-label="Welcome to the demo"] {
+            width: min(98vw, 1560px) !important;
+            max-width: 98vw !important;
+            margin: 1vh auto !important;
+        }
+        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"] > div,
+        div[role="dialog"][aria-label="Welcome to the demo"] > div {
+            max-height: 96vh !important;
+            min-height: 96vh !important;
+            overflow-y: auto !important;
+            padding: 1rem 1.25rem 1.3rem 1.25rem !important;
+        }
+        div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"] h1,
+        div[role="dialog"][aria-label="Welcome to the demo"] h1 {
+            font-size: 1.35rem !important;
+        }
+        @media (min-width: 900px) {
+            div[data-testid="stDialog"] div[role="dialog"][aria-label="Welcome to the demo"],
+            div[role="dialog"][aria-label="Welcome to the demo"] {
+                width: min(98vw, 1640px) !important;
+                max-width: 98vw !important;
+            }
+        }
+        .onboarding-progress-note {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin: 0.25rem 0 0.65rem 0;
+            font-size: 0.83rem;
+            color: rgba(51, 65, 85, 0.8);
+            flex-wrap: wrap;
+        }
+        .onboarding-progress-note strong {
+            color: rgba(15, 23, 42, 0.95);
+        }
+        .onboarding-actions-note {
+            margin: 0.25rem 0 0.75rem 0;
+            font-size: 0.82rem;
+            color: rgba(71, 85, 105, 0.82);
+        }
+        .onboarding-destination-card {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 20px;
+            padding: 1rem 1rem 0.95rem 1rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+            min-height: 210px;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+            margin-bottom: 0.6rem;
+        }
+        .onboarding-destination-card--recommended {
+            border-color: rgba(37, 99, 235, 0.22);
+            background: linear-gradient(180deg, rgba(239,246,255,0.96), rgba(255,255,255,0.98));
+            box-shadow: 0 12px 28px rgba(37, 99, 235, 0.08);
+        }
+        .onboarding-destination-kicker {
+            display: inline-block;
+            padding: 0.16rem 0.48rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 0.7rem;
+            background: rgba(15, 23, 42, 0.06);
+            color: rgba(51, 65, 85, 0.9);
+        }
+        .onboarding-destination-header {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            margin-bottom: 0.6rem;
+        }
+        .onboarding-destination-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+        }
+        .onboarding-destination-copy {
+            font-size: 0.88rem;
+            line-height: 1.52;
+            color: rgba(49, 51, 63, 0.8);
+            margin-bottom: 0.5rem;
+        }
+        .onboarding-destination-note {
+            font-size: 0.8rem;
+            color: rgba(71, 85, 105, 0.88);
+        }
         .app-status-strip {
             display: flex;
             align-items: flex-start;
@@ -1157,17 +1244,23 @@ def inject_global_styles():
         .home-icon-tile {
             border: 1px solid rgba(49, 51, 63, 0.10);
             border-radius: 24px;
-            padding: 0.75rem 0.72rem 0.65rem;
+            padding: 0.9rem 0.82rem 0.8rem;
             background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
             box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
             text-align: center;
-            min-height: 156px;
-            margin-bottom: 0.4rem;
+            min-height: 184px;
+            margin-bottom: 0.5rem;
+            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        }
+        .home-icon-tile--recommended {
+            border-color: rgba(37, 99, 235, 0.22);
+            background: linear-gradient(180deg, rgba(239,246,255,0.98), rgba(255,255,255,0.94));
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.10);
         }
         .home-icon-badge {
             width: 56px;
             height: 56px;
-            margin: 0 auto 0.45rem;
+            margin: 0 auto 0.6rem;
             border-radius: 20px;
             display: flex;
             align-items: center;
@@ -1177,20 +1270,20 @@ def inject_global_styles():
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 8px 18px rgba(37, 99, 235, 0.12);
         }
         .home-icon-label {
-            font-size: 0.96rem;
+            font-size: 1rem;
             font-weight: 700;
             color: rgba(15, 23, 42, 0.98);
-            margin-bottom: 0.24rem;
+            margin-bottom: 0.32rem;
         }
         .home-icon-copy {
-            font-size: 0.79rem;
-            line-height: 1.35;
+            font-size: 0.82rem;
+            line-height: 1.42;
             color: rgba(49, 51, 63, 0.74);
-            min-height: 40px;
+            min-height: 52px;
         }
         .home-icon-caption {
             display: inline-block;
-            margin-top: 0.28rem;
+            margin-top: 0.42rem;
             padding: 0.16rem 0.48rem;
             border-radius: 999px;
             background: rgba(15, 23, 42, 0.06);
@@ -1541,6 +1634,31 @@ def render_onboarding_panel(title: str, body: str, bullets: list[str], kicker: s
             <div class="onboarding-panel-title">{title}</div>
             <div class="onboarding-panel-copy">{body}</div>
             <ul class="onboarding-panel-list">{items_html}</ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_onboarding_destination_card(
+    icon: str,
+    title: str,
+    body: str,
+    note: str,
+    kicker: str,
+    recommended: bool = False,
+):
+    recommended_class = " onboarding-destination-card--recommended" if recommended else ""
+    st.markdown(
+        f"""
+        <div class="onboarding-destination-card{recommended_class}">
+            <div class="onboarding-destination-kicker">{kicker}</div>
+            <div class="onboarding-destination-header">
+                <div>{icon_badge_html(icon, 'md')}</div>
+                <div class="onboarding-destination-title">{title}</div>
+            </div>
+            <div class="onboarding-destination-copy">{body}</div>
+            <div class="onboarding-destination-note">{note}</div>
         </div>
         """,
         unsafe_allow_html=True,

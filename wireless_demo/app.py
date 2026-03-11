@@ -14,6 +14,7 @@ from .ux import (
     inject_global_styles,
     render_app_footer,
     render_disclaimer_banner,
+    render_onboarding_destination_card,
     render_onboarding_panel,
     render_sidebar_hint,
     render_sidebar_intro_card,
@@ -85,14 +86,30 @@ def _restart_onboarding():
     st.session_state.welcome_prompt_dismissed = False
 
 
+def _render_onboarding_progress(step: int):
+    step_title = ONBOARDING_STEP_TITLES.get(step, "Onboarding")
+    st.markdown(
+        (
+            "<div class='onboarding-progress-note'>"
+            f"<span><strong>Slide {step} of {ONBOARDING_TOTAL_STEPS}</strong> · {step_title}</span>"
+            "<span>Use the blue button to continue</span>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+    st.progress(step / ONBOARDING_TOTAL_STEPS)
+
+
+def _render_onboarding_action_hint(message: str):
+    st.markdown(f"<div class='onboarding-actions-note'>{message}</div>", unsafe_allow_html=True)
+
+
 @st.dialog("Welcome to the demo")
 def _render_first_open_welcome_dialog():
     step = st.session_state.get("onboarding_step", 1)
     st.session_state.setdefault("onboarding_scenario", st.session_state.get("scenario_selector", "Normal"))
     st.session_state.setdefault("onboarding_role", st.session_state.get("role_selector_preview", "AI Builder"))
-    step_title = ONBOARDING_STEP_TITLES.get(step, "Onboarding")
-    st.caption(f"Slide {step} of {ONBOARDING_TOTAL_STEPS} · {step_title}")
-    st.progress(step / ONBOARDING_TOTAL_STEPS)
+    _render_onboarding_progress(step)
 
     if step == 1:
         render_onboarding_panel(
@@ -106,11 +123,12 @@ def _render_first_open_welcome_dialog():
             kicker="Welcome",
             variant="info",
         )
-        cols = st.columns([1, 1])
-        if cols[0].button("Start on Home", key="onboarding_skip_step1", use_container_width=True):
+        _render_onboarding_action_hint("First time here? Click the blue button: Continue guided onboarding. Skip only if you already know the demo.")
+        cols = st.columns([1, 1.7])
+        if cols[0].button("Skip intro", key="onboarding_skip_step1", use_container_width=True, type="secondary"):
             _close_onboarding(open_tab="Home")
             st.rerun()
-        if cols[1].button("Set my context", key="onboarding_next_step1", use_container_width=True):
+        if cols[1].button("Continue guided onboarding", key="onboarding_next_step1", use_container_width=True, type="primary"):
             st.session_state.onboarding_step = 2
             st.rerun()
         return
@@ -129,15 +147,16 @@ def _render_first_open_welcome_dialog():
         select_cols = st.columns(2)
         select_cols[0].selectbox("Scenario", ONBOARDING_SCENARIOS, key="onboarding_scenario")
         select_cols[1].selectbox("Audience view", ONBOARDING_ROLES, key="onboarding_role")
-        cols = st.columns([1, 1, 1])
-        if cols[0].button("Back", key="onboarding_back_step2", use_container_width=True):
+        _render_onboarding_action_hint("Recommended defaults are already selected. Change them only if you want to tell a different story.")
+        cols = st.columns([1, 1.2, 1.7])
+        if cols[0].button("Back", key="onboarding_back_step2", use_container_width=True, type="secondary"):
             st.session_state.onboarding_step = 1
             st.rerun()
-        if cols[1].button("Use defaults", key="onboarding_defaults_step2", use_container_width=True):
+        if cols[1].button("Use recommended defaults", key="onboarding_defaults_step2", use_container_width=True, type="secondary"):
             st.session_state.onboarding_scenario = "Normal"
             st.session_state.onboarding_role = "AI Builder"
             st.rerun()
-        if cols[2].button("See the model story", key="onboarding_next_step2", use_container_width=True):
+        if cols[2].button("Next: see the model story", key="onboarding_next_step2", use_container_width=True, type="primary"):
             st.session_state.onboarding_step = 3
             st.rerun()
         return
@@ -154,11 +173,12 @@ def _render_first_open_welcome_dialog():
             kicker="Step 3",
             variant="info",
         )
+        _render_onboarding_action_hint("Continue to see which parts of the demo are included in the walkthrough.")
         cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True):
+        if cols[0].button("Back", key="onboarding_back_step3", use_container_width=True, type="secondary"):
             st.session_state.onboarding_step = 2
             st.rerun()
-        if cols[1].button("See what is included", key="onboarding_next_step3", use_container_width=True):
+        if cols[1].button("Next: what is included", key="onboarding_next_step3", use_container_width=True, type="primary"):
             st.session_state.onboarding_step = 4
             st.rerun()
         return
@@ -175,11 +195,12 @@ def _render_first_open_welcome_dialog():
             kicker="Step 4",
             variant="info",
         )
+        _render_onboarding_action_hint("Continue to see the simple operator workflow used throughout the demo.")
         cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True):
+        if cols[0].button("Back", key="onboarding_back_step4", use_container_width=True, type="secondary"):
             st.session_state.onboarding_step = 3
             st.rerun()
-        if cols[1].button("See the workflow", key="onboarding_next_step4", use_container_width=True):
+        if cols[1].button("Next: see the workflow", key="onboarding_next_step4", use_container_width=True, type="primary"):
             st.session_state.onboarding_step = 5
             st.rerun()
         return
@@ -196,11 +217,12 @@ def _render_first_open_welcome_dialog():
             kicker="Step 5",
             variant="info",
         )
+        _render_onboarding_action_hint("One more step: choose where to begin the live demo.")
         cols = st.columns([1, 1])
-        if cols[0].button("Back", key="onboarding_back_step5", use_container_width=True):
+        if cols[0].button("Back", key="onboarding_back_step5", use_container_width=True, type="secondary"):
             st.session_state.onboarding_step = 4
             st.rerun()
-        if cols[1].button("Choose a starting view", key="onboarding_next_step5", use_container_width=True):
+        if cols[1].button("Next: choose a starting view", key="onboarding_next_step5", use_container_width=True, type="primary"):
             st.session_state.onboarding_step = 6
             st.rerun()
         return
@@ -216,18 +238,54 @@ def _render_first_open_welcome_dialog():
         kicker="Step 6",
         variant="info",
     )
-    cols = st.columns([1, 1, 1, 1])
-    if cols[0].button("Back", key="onboarding_back_step6", use_container_width=True):
+    _render_onboarding_action_hint("Recommended first stop: Home overview. Use the alternatives only if you already know where you want to jump.")
+    destination_cols = st.columns(3)
+    with destination_cols[0]:
+        render_onboarding_destination_card(
+            icon="home",
+            title="Home overview",
+            body="Best first stop for most users. It gives the presentation view and lets you tailor the scenario and audience.",
+            note="Recommended for first-time visitors.",
+            kicker="Recommended",
+            recommended=True,
+        )
+        if st.button("Open Home overview", key="onboarding_open_home", use_container_width=True, type="primary"):
+            _close_onboarding(open_tab="Home")
+            st.rerun()
+    with destination_cols[1]:
+        render_onboarding_destination_card(
+            icon="overview",
+            title="Live monitoring",
+            body="Jump straight into the operational picture with current fleet posture, map context, and risk patterns.",
+            note="Use this if you want to start with the live story.",
+            kicker="Operations",
+        )
+        if st.button(
+            "Jump to live monitoring",
+            key="onboarding_open_overview",
+            use_container_width=True,
+            type="secondary",
+        ):
+            _close_onboarding(open_tab="Overview")
+            st.rerun()
+    with destination_cols[2]:
+        render_onboarding_destination_card(
+            icon="setup",
+            title="Model setup guide",
+            body="Open the setup walkthrough if you want to refresh or explain the detector and threat-typing models first.",
+            note="Use this when setup or refresh is part of the presentation.",
+            kicker="Preparation",
+        )
+        if st.button(
+            "Open model setup guide",
+            key="onboarding_open_setup",
+            use_container_width=True,
+            type="secondary",
+        ):
+            _close_onboarding(open_tab="Home", open_setup=True)
+            st.rerun()
+    if st.button("Back", key="onboarding_back_step6", use_container_width=True, type="secondary"):
         st.session_state.onboarding_step = 5
-        st.rerun()
-    if cols[1].button("Home overview", key="onboarding_open_home", use_container_width=True):
-        _close_onboarding(open_tab="Home")
-        st.rerun()
-    if cols[2].button("Live monitoring", key="onboarding_open_overview", use_container_width=True):
-        _close_onboarding(open_tab="Overview")
-        st.rerun()
-    if cols[3].button("Model setup guide", key="onboarding_open_setup", use_container_width=True):
-        _close_onboarding(open_tab="Home", open_setup=True)
         st.rerun()
 
 
