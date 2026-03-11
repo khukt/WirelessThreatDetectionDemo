@@ -3,7 +3,7 @@ import pandas as pd
 
 from ..hitl import current_hitl_policy, incident_review_key, review_rows
 from ..training import render_training_explainer
-from ..ux import render_footerline, render_funding_acknowledgement, render_section_card, render_tab_intro
+from ..ux import render_focus_callout, render_section_card, render_summary_list, render_tab_intro
 
 
 @st.cache_data(show_spinner=False)
@@ -49,8 +49,7 @@ def _render_role_governance_summary(role):
     summary = ROLE_GOVERNANCE_SUMMARY.get(role)
     if not summary:
         return
-    st.markdown(f"### {summary['title']}")
-    st.markdown("\n".join([f"- {bullet}" for bullet in summary["bullets"]]))
+    render_summary_list(summary["title"], summary["bullets"], kicker="Audience summary")
 PILLAR_STATUS_STYLE = {
     "Strong": "background: rgba(22, 163, 74, 0.14); color: #166534;",
     "Partial": "background: rgba(245, 158, 11, 0.16); color: #92400e;",
@@ -160,7 +159,7 @@ def _render_pillar_card(pillar):
 def render_governance_tab(role):
     nonce = st.session_state.ui_nonce
     render_tab_intro("Governance", role)
-    st.info(f"{role} focus: {ROLE_GOVERNANCE_CALLOUT.get(role, ROLE_GOVERNANCE_CALLOUT['End User'])}")
+    render_focus_callout("Role focus", ROLE_GOVERNANCE_CALLOUT.get(role, ROLE_GOVERNANCE_CALLOUT["End User"]))
     render_section_card(
         "EU AI Act — Transparency & Governance",
         "This page brings together trust controls, human oversight, auditability, and governance gaps visible in the demo. It is a practical demo view, not legal advice.",
@@ -262,7 +261,7 @@ def render_governance_tab(role):
                 use_container_width=True,
             )
     else:
-        st.info("No human review records yet. Triage incidents to generate an audit trail.")
+            render_focus_callout("Audit trail empty", "Triage incidents to generate human review records and populate the audit trail.")
 
     render_section_card(
         "Technical training detail",
@@ -271,10 +270,3 @@ def render_governance_tab(role):
     )
     render_training_explainer(nonce)
 
-    render_section_card(
-        "Project context",
-        "This demo is supported by public and research funding partners. Include this section when presenting the assurance, research, and project context around the work.",
-        kicker="Acknowledgement",
-    )
-    render_funding_acknowledgement()
-    render_footerline()

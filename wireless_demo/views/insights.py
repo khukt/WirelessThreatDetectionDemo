@@ -8,7 +8,7 @@ from textwrap import dedent, fill
 from ..attack_education import render_attack_academy
 from ..config import FEATURE_GLOSSARY
 from ..helpers import shap_pos
-from ..ux import render_section_card, render_tab_intro, style_plotly_figure
+from ..ux import render_focus_callout, render_section_card, render_summary_list, render_tab_intro, style_plotly_figure
 
 
 ROLE_INSIGHTS_CALLOUT = {
@@ -47,8 +47,7 @@ def _render_role_summary(role):
     summary = ROLE_INSIGHTS_SUMMARY.get(role)
     if not summary:
         return
-    st.markdown(f"### {summary['title']}")
-    st.markdown("\n".join([f"- {bullet}" for bullet in summary["bullets"]]))
+    render_summary_list(summary["title"], summary["bullets"], kicker="Audience summary")
 
 
 @st.cache_data(show_spinner=False)
@@ -90,7 +89,7 @@ def _stakeholder_architecture_figure():
             "y0": 0.58,
             "x1": 0.22,
             "y1": 0.90,
-            "icon": "📡",
+            "icon": "RF",
             "title": "Fleet signals",
             "subtitle": "RF, GNSS, access, and integrity telemetry",
             "fill": "rgba(14,116,144,0.08)",
@@ -102,7 +101,7 @@ def _stakeholder_architecture_figure():
             "y0": 0.58,
             "x1": 0.46,
             "y1": 0.90,
-            "icon": "🧠",
+            "icon": "ML",
             "title": "Anomaly model",
             "subtitle": "Binary LightGBM estimates suspicious behavior",
             "fill": "rgba(239,68,68,0.08)",
@@ -114,7 +113,7 @@ def _stakeholder_architecture_figure():
             "y0": 0.58,
             "x1": 0.70,
             "y1": 0.90,
-            "icon": "🛡️",
+            "icon": "QA",
             "title": "Confidence layer",
             "subtitle": "Threshold and conformal p-value grade alert confidence",
             "fill": "rgba(245,158,11,0.08)",
@@ -126,7 +125,7 @@ def _stakeholder_architecture_figure():
             "y0": 0.58,
             "x1": 0.94,
             "y1": 0.90,
-            "icon": "🎯",
+            "icon": "CLS",
             "title": "Attack typing",
             "subtitle": "Multiclass model and domain rules identify the likely threat family",
             "fill": "rgba(168,85,247,0.08)",
@@ -138,7 +137,7 @@ def _stakeholder_architecture_figure():
             "y0": 0.08,
             "x1": 0.73,
             "y1": 0.36,
-            "icon": "👤",
+            "icon": "HITL",
             "title": "Human oversight",
             "subtitle": "Analyst approves, escalates, or rejects alerts. Review outcomes shape future triage.",
             "fill": "rgba(16,185,129,0.08)",
@@ -171,7 +170,7 @@ def _stakeholder_architecture_figure():
         fig.add_annotation(
             x=(spec["x0"] + spec["x1"]) / 2,
             y=spec["y1"] - 0.075,
-            text=f"{spec['icon']} <b>{spec['title']}</b>",
+            text=f"<b>{spec['icon']}</b> · <b>{spec['title']}</b>",
             showarrow=False,
             font=dict(size=14, color="#0f172a"),
             align="center",
@@ -388,7 +387,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(14,116,144,0.08)",
             "accent": "rgba(14,116,144,0.90)",
             "step": "1",
-            "icon": "📡",
+            "icon": "RF",
             "wrap_width": 36,
         },
         {
@@ -398,7 +397,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(59,130,246,0.08)",
             "accent": "rgba(59,130,246,0.88)",
             "step": "2",
-            "icon": "📈",
+            "icon": "FE",
             "wrap_width": 34,
         },
         {
@@ -408,7 +407,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(239,68,68,0.08)",
             "accent": "rgba(239,68,68,0.88)",
             "step": "3",
-            "icon": "🧠",
+            "icon": "ML",
             "wrap_width": 34,
         },
         {
@@ -418,7 +417,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(245,158,11,0.08)",
             "accent": "rgba(245,158,11,0.90)",
             "step": "4",
-            "icon": "🛡️",
+            "icon": "QA",
             "wrap_width": 34,
         },
         {
@@ -428,7 +427,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(15,23,42,0.08)",
             "accent": "rgba(15,23,42,0.88)",
             "step": "6",
-            "icon": "📋",
+            "icon": "OUT",
             "wrap_width": 34,
         },
     ]
@@ -440,7 +439,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(168,85,247,0.08)",
             "accent": "rgba(168,85,247,0.90)",
             "step": "5",
-            "icon": "🎯",
+            "icon": "CLS",
             "centered": True,
             "wrap_width": 18,
         },
@@ -451,7 +450,7 @@ def _model_decision_pipeline_figure():
             "fill": "rgba(16,185,129,0.08)",
             "accent": "rgba(16,185,129,0.88)",
             "step": "R",
-            "icon": "🧭",
+            "icon": "CTX",
             "centered": True,
             "wrap_width": 18,
         },
@@ -589,9 +588,9 @@ def _render_transparency_side_panel(metrics, training_info, threshold, type_metr
         metric_cols_bottom[1].metric("Type confidence τ", tau_text)
 
         st.caption("DECISION STAGES")
-        st.info("Stage 1 — Detect anomaly: The binary model converts rolling telemetry into an anomaly probability for each device window.")
-        st.info("Stage 2 — Explain threat family: Only suspicious cases go to the attack-type model, which is fused with domain rules for clearer labels.")
-        st.info("Controls — Calibrate confidence: Thresholding, conformal p-values, and confidence fusion reduce overconfident alerts before review.")
+        render_focus_callout("Stage 1 — Detect anomaly", "The binary model converts rolling telemetry into an anomaly probability for each device window.")
+        render_focus_callout("Stage 2 — Explain threat family", "Only suspicious cases go to the attack-type model, which is fused with domain rules for clearer labels.")
+        render_focus_callout("Controls — Calibrate confidence", "Thresholding, conformal p-values, and confidence fusion reduce overconfident alerts before review.")
 
         st.caption("Human reviewers still approve, reject, or escalate the final incident.")
 
@@ -671,7 +670,7 @@ def _render_model_transparency_card(nonce, role):
                     key=f"transparency_top_features_{nonce}",
                 )
             else:
-                st.info("Run model setup to show the most influential features.")
+                render_focus_callout("Model setup needed", "Run model setup to show the most influential features.", variant="warning")
 
         with tabs[2]:
             st.caption("Configuration snapshot")
@@ -730,7 +729,7 @@ def render_insights_tab(role):
     nonce = st.session_state.ui_nonce
     summary_role = _is_summary_role(role)
     render_tab_intro("Insights", role)
-    st.info(f"{role} focus: {ROLE_INSIGHTS_CALLOUT.get(role, ROLE_INSIGHTS_CALLOUT['End User'])}")
+    render_focus_callout("Role focus", ROLE_INSIGHTS_CALLOUT.get(role, ROLE_INSIGHTS_CALLOUT["End User"]))
     _render_role_summary(role)
     render_attack_academy(role, selected_scenario=st.session_state.get("scenario_selector", "Normal"))
     _render_model_transparency_card(nonce, role)
@@ -766,7 +765,7 @@ def render_insights_tab(role):
                         key=f"global_importance_{nonce}",
                     )
                 else:
-                    st.info("Run model setup to view global importance.")
+                    render_focus_callout("Model setup needed", "Run model setup to view global importance.", variant="warning")
 
         with col2:
             with st.container(border=True):
@@ -800,7 +799,7 @@ def render_insights_tab(role):
                             key=f"calibration_curve_{nonce}",
                         )
                 else:
-                    st.info("Run model setup or refresh to view calibration.")
+                    render_focus_callout("Model setup needed", "Run model setup or refresh to view calibration.", variant="warning")
 
         with st.container(border=True):
             st.markdown("#### Feature glossary")

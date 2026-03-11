@@ -10,7 +10,7 @@ from ..attack_education import render_current_attack_brief
 from ..config import CFG, DEVICE_TYPES
 from ..hitl import current_hitl_policy, latest_review_for_device
 from ..helpers import conformal_pvalue, haversine_m, meters_to_latlon_offset, severity
-from ..ux import render_scenario_context, render_section_card, render_tab_intro, style_plotly_figure
+from ..ux import render_focus_callout, render_scenario_context, render_section_card, render_tab_intro, style_plotly_figure
 
 
 ROLE_OVERVIEW_CALLOUT = {
@@ -90,7 +90,7 @@ def _scenario_spotlight(df_map, scenario):
 
 def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
     render_tab_intro("Overview", role)
-    st.info(f"{role} focus: {ROLE_OVERVIEW_CALLOUT.get(role, ROLE_OVERVIEW_CALLOUT['End User'])}")
+    render_focus_callout("Role focus", ROLE_OVERVIEW_CALLOUT.get(role, ROLE_OVERVIEW_CALLOUT["End User"]))
     render_scenario_context(scenario)
     render_current_attack_brief(scenario, role, title="Scenario explainer")
     render_section_card(
@@ -131,7 +131,7 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
             st.caption("Geospatial view")
             st.markdown("#### Fleet map and scenario overlays")
         if not show_map:
-            st.info("Enable **Show geospatial map** from the sidebar to visualize devices and attack radius overlays.")
+            render_focus_callout("Map hidden", "Enable geospatial map in the sidebar to visualize devices and scenario radius overlays.")
         elif st.session_state.get("model") is not None:
             latest_device_metrics = {
                 device_id: (buf[-1] if buf and len(buf) > 0 else {})
@@ -297,7 +297,7 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
                     "- **Colored radius overlays**: active scenario coverage zone"
                 )
         else:
-            st.info("Run model setup to unlock the live map, risk overlays, and anomaly timeline charts.")
+            render_focus_callout("Model setup needed", "Run model setup to unlock the live map, risk overlays, and anomaly timeline charts.", variant="warning")
 
         fleet_records = pd.DataFrame(list(st.session_state.fleet_records))
         render_section_card(
@@ -328,10 +328,11 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
         if spotlight:
             with st.container(border=True):
                 st.markdown(f"#### {spotlight['title']}")
-                if active_alerts > 0:
-                    st.warning(spotlight["message"])
-                else:
-                    st.info(spotlight["message"])
+                render_focus_callout(
+                    "Scenario spotlight",
+                    spotlight["message"],
+                    variant="warning" if active_alerts > 0 else "info",
+                )
                 spotlight_devices = spotlight.get("devices", [])
                 if spotlight_devices:
                     st.caption("Most affected devices in the active zone")
@@ -386,4 +387,4 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
                 st.caption("Escalated devices are boosted to the top; recently false-positive devices can be suppressed from the incident stream.")
                 st.dataframe(pd.DataFrame(leaderboard).sort_values(["queue_score", "prob"], ascending=False).head(10), width="stretch")
         else:
-            st.info("No active risk rankings yet. Start playback or run model setup first.")
+            render_focus_callout("No queue yet", "Start playback or run model setup first to generate live risk rankings.")

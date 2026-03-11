@@ -1,9 +1,39 @@
+import base64
 import time
 from textwrap import dedent
 from typing import Optional
 
 import requests
 import streamlit as st
+
+
+ICON_BADGES = {
+    "home": ("HM", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "overview": ("OP", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "fleet": ("FL", "rgba(100, 116, 139, 0.05)", "rgba(100, 116, 139, 0.10)", "#475569"),
+    "incidents": ("IR", "rgba(127, 29, 29, 0.05)", "rgba(127, 29, 29, 0.10)", "#7f1d1d"),
+    "insights": ("AI", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "governance": ("GV", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "normal": ("OK", "rgba(21, 128, 61, 0.05)", "rgba(21, 128, 61, 0.10)", "#166534"),
+    "jamming": ("RF", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "breach": ("AC", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "spoofing": ("GN", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "tamper": ("DT", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "end_user": ("EU", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "domain_expert": ("DE", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "regulator": ("RG", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "ai_builder": ("ML", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "executive": ("EX", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "step_1": ("1", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "step_2": ("2", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "step_3": ("3", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "scenario": ("SC", "rgba(71, 85, 105, 0.05)", "rgba(71, 85, 105, 0.10)", "#475569"),
+    "setup": ("UP", "rgba(51, 65, 85, 0.05)", "rgba(51, 65, 85, 0.10)", "#475569"),
+    "navigator": ("UI", "rgba(15, 23, 42, 0.04)", "rgba(15, 23, 42, 0.08)", "#334155"),
+    "notice": ("NT", "rgba(146, 64, 14, 0.05)", "rgba(146, 64, 14, 0.10)", "#92400e"),
+    "cache": ("CH", "rgba(30, 64, 175, 0.05)", "rgba(30, 64, 175, 0.10)", "#1e40af"),
+    "ready": ("OK", "rgba(21, 128, 61, 0.05)", "rgba(21, 128, 61, 0.10)", "#166534"),
+}
 
 
 SCENARIO_COPY = {
@@ -68,12 +98,12 @@ TAB_COPY = {
 }
 
 TAB_DISPLAY_LABELS = {
-    "Home": "⌂ Home",
-    "Overview": "🛰 Overview",
-    "Fleet View": "🚚 Fleet",
-    "Incidents": "🚨 Incidents",
-    "Insights": "🧠 Insights",
-    "Governance": "🛡 Governance",
+    "Home": "Home",
+    "Overview": "Overview",
+    "Fleet View": "Fleet",
+    "Incidents": "Incidents",
+    "Insights": "Insights",
+    "Governance": "Governance",
 }
 
 ROLE_TAB_ORDER = {
@@ -292,6 +322,202 @@ def inject_global_styles():
             padding: 0.85rem 1rem;
             background: rgba(255,255,255,0.65);
             min-height: 108px;
+        }
+        .pro-icon-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+            box-sizing: border-box;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+        }
+        .pro-icon-badge--sm {
+            min-width: 28px;
+            height: 28px;
+            padding: 0 0.45rem;
+            font-size: 0.68rem;
+        }
+        .pro-icon-badge--md {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 0.55rem;
+            font-size: 0.7rem;
+        }
+        .pro-icon-badge--lg {
+            min-width: 42px;
+            height: 42px;
+            padding: 0 0.7rem;
+            font-size: 0.78rem;
+            border-radius: 16px;
+        }
+        .inline-icon-heading {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0.35rem;
+        }
+        .inline-icon-heading-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+        }
+        .app-disclaimer {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            padding: 0.8rem 0.9rem;
+            border-radius: 18px;
+            border: 1px solid rgba(245, 158, 11, 0.20);
+            background: linear-gradient(180deg, rgba(255,251,235,0.96), rgba(255,255,255,0.94));
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+            margin-bottom: 0.75rem;
+        }
+        .app-disclaimer-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+            margin-top: 0.05rem;
+        }
+        .app-disclaimer-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: rgba(146, 64, 14, 0.98);
+            margin-bottom: 0.12rem;
+        }
+        .app-disclaimer-copy {
+            font-size: 0.84rem;
+            line-height: 1.45;
+            color: rgba(120, 53, 15, 0.88);
+        }
+        .onboarding-panel {
+            padding: 0.95rem 1rem;
+            border-radius: 20px;
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(248,250,252,0.94));
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+            margin-bottom: 0.8rem;
+        }
+        .onboarding-panel--info {
+            border-color: rgba(59, 130, 246, 0.18);
+            background: linear-gradient(180deg, rgba(239,246,255,0.95), rgba(255,255,255,0.96));
+        }
+        .onboarding-panel--warning {
+            border-color: rgba(245, 158, 11, 0.20);
+            background: linear-gradient(180deg, rgba(255,251,235,0.96), rgba(255,255,255,0.96));
+        }
+        .onboarding-panel-kicker {
+            display: inline-block;
+            padding: 0.16rem 0.48rem;
+            border-radius: 999px;
+            font-size: 0.73rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            background: rgba(15, 23, 42, 0.06);
+            color: rgba(51, 65, 85, 0.9);
+        }
+        .onboarding-panel-title {
+            font-size: 1.08rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.2rem;
+        }
+        .onboarding-panel-copy {
+            font-size: 0.9rem;
+            line-height: 1.48;
+            color: rgba(49, 51, 63, 0.78);
+            margin-bottom: 0.55rem;
+        }
+        .onboarding-panel-list {
+            margin: 0;
+            padding-left: 1.1rem;
+            color: rgba(49, 51, 63, 0.82);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+        .app-status-strip {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            padding: 0.72rem 0.85rem;
+            border-radius: 16px;
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            background: linear-gradient(180deg, rgba(239,246,255,0.96), rgba(255,255,255,0.95));
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+            margin-bottom: 0.7rem;
+        }
+        .app-status-strip-icon {
+            font-size: 1rem;
+            line-height: 1;
+            margin-top: 0.05rem;
+        }
+        .app-status-strip-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: rgba(30, 64, 175, 0.98);
+            margin-bottom: 0.08rem;
+        }
+        .app-status-strip-copy {
+            font-size: 0.82rem;
+            line-height: 1.4;
+            color: rgba(30, 41, 59, 0.82);
+        }
+        .focus-callout {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            padding: 0.8rem 0.9rem;
+            background: rgba(255,255,255,0.82);
+            margin-bottom: 0.75rem;
+        }
+        .focus-callout--info {
+            border-color: rgba(37, 99, 235, 0.14);
+            background: linear-gradient(180deg, rgba(239,246,255,0.92), rgba(255,255,255,0.96));
+        }
+        .focus-callout--warning {
+            border-color: rgba(245, 158, 11, 0.16);
+            background: linear-gradient(180deg, rgba(255,251,235,0.94), rgba(255,255,255,0.96));
+        }
+        .focus-callout-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.96);
+            margin-bottom: 0.12rem;
+        }
+        .focus-callout-copy {
+            font-size: 0.85rem;
+            line-height: 1.45;
+            color: rgba(49, 51, 63, 0.78);
+        }
+        .summary-list-panel {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            padding: 0.85rem 0.95rem;
+            background: rgba(255,255,255,0.78);
+            margin-bottom: 0.75rem;
+        }
+        .summary-list-kicker {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.72);
+            font-weight: 700;
+            margin-bottom: 0.16rem;
+        }
+        .summary-list-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.96);
+            margin-bottom: 0.35rem;
+        }
+        .summary-list-items {
+            margin: 0;
+            padding-left: 1.05rem;
+            color: rgba(49, 51, 63, 0.82);
+            font-size: 0.88rem;
+            line-height: 1.55;
         }
         .summary-kicker {
             font-size: 0.72rem;
@@ -877,6 +1103,14 @@ def inject_global_styles():
             line-height: 1.35;
             color: rgba(49, 51, 63, 0.74);
         }
+        .sidebar-kicker {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.72);
+            font-weight: 700;
+            margin-bottom: 0.18rem;
+        }
         .sidebar-chip-row {
             display: flex;
             flex-wrap: wrap;
@@ -918,6 +1152,32 @@ def inject_global_styles():
             color: #475569;
             border-color: rgba(71, 85, 105, 0.18);
         }
+        .sidebar-hint {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 14px;
+            padding: 0.62rem 0.72rem;
+            background: rgba(255,255,255,0.8);
+            margin: 0.15rem 0 0.55rem;
+        }
+        .sidebar-hint--info {
+            border-color: rgba(37, 99, 235, 0.12);
+            background: rgba(239,246,255,0.7);
+        }
+        .sidebar-hint--neutral {
+            border-color: rgba(49, 51, 63, 0.08);
+            background: rgba(248,250,252,0.88);
+        }
+        .sidebar-hint-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.92);
+            margin-bottom: 0.12rem;
+        }
+        .sidebar-hint-copy {
+            font-size: 0.78rem;
+            line-height: 1.38;
+            color: rgba(49, 51, 63, 0.74);
+        }
         .stTabs [data-baseweb="tab-list"] {
             gap: 0.35rem;
             background: rgba(15, 23, 42, 0.05);
@@ -949,6 +1209,95 @@ def inject_global_styles():
         .stTabs [aria-selected="false"]:hover {
             background: rgba(255,255,255,0.56);
             opacity: 1;
+        }
+        .app-footer {
+            margin-top: 1rem;
+            padding: 0.95rem 1rem 0.8rem;
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 22px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+        }
+        .app-footer-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.18rem;
+        }
+        .app-footer-copy {
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: rgba(49, 51, 63, 0.78);
+            margin-bottom: 0.7rem;
+        }
+        .footer-funding-lead {
+            font-size: 0.84rem;
+            line-height: 1.45;
+            color: rgba(49, 51, 63, 0.78);
+            margin: 0.1rem 0 0.65rem;
+        }
+        .footer-sponsor-card {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 16px;
+            padding: 0.65rem 0.7rem 0.55rem;
+            background: rgba(255,255,255,0.82);
+            min-height: 168px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+        }
+        .footer-sponsor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.7rem;
+            align-items: stretch;
+        }
+        .footer-sponsor-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.96);
+            margin-bottom: 0.35rem;
+        }
+        .footer-sponsor-copy {
+            font-size: 0.76rem;
+            line-height: 1.35;
+            color: rgba(49, 51, 63, 0.74);
+            margin-bottom: 0.5rem;
+        }
+        .footer-sponsor-logo {
+            height: 44px;
+            width: auto;
+            max-width: 100%;
+            object-fit: contain;
+            margin: 0.2rem 0 0.55rem;
+        }
+        .footer-sponsor-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.48rem 0.65rem;
+            border-radius: 12px;
+            background: rgba(37, 99, 235, 0.10);
+            color: #1d4ed8;
+            text-decoration: none;
+            font-size: 0.79rem;
+            font-weight: 700;
+            border: 1px solid rgba(37, 99, 235, 0.14);
+            box-sizing: border-box;
+        }
+        .footer-sponsor-link:hover {
+            background: rgba(37, 99, 235, 0.14);
+            color: #1e40af;
+        }
+        .footer-contact-line {
+            margin-top: 0.55rem;
+        }
+        @media (max-width: 900px) {
+            .footer-sponsor-grid {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """,
@@ -988,6 +1337,92 @@ def render_header(profile: str, scenario: str, role: str):
             """,
             unsafe_allow_html=True,
         )
+
+
+def icon_badge_html(name: str, size: str = "md") -> str:
+    label, bg, border, fg = ICON_BADGES.get(name, ICON_BADGES["navigator"])
+    return (
+        f"<span class='pro-icon-badge pro-icon-badge--{size}' "
+        f"style='background:{bg};border-color:{border};color:{fg};'>{label}</span>"
+    )
+
+
+def render_disclaimer_banner():
+    st.markdown(
+        """
+        <div class="app-disclaimer">
+            <div class="app-disclaimer-icon">"""
+        + icon_badge_html("notice", "sm")
+        + """</div>
+            <div>
+                <div class="app-disclaimer-title">Educational demo only</div>
+                <div class="app-disclaimer-copy">This app is for demonstration, learning, and research. It is not intended for production, commercial, safety, or operational deployment.</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("See full disclaimer", expanded=False):
+        st.markdown(
+            "This demo is provided as a proof-of-concept experience only. All content, data, and examples are intended for learning and research. "
+            "It should not be used for commercial, production, or operational deployment, and the authors assume no responsibility for misuse or unintended application."
+        )
+
+
+def render_onboarding_panel(title: str, body: str, bullets: list[str], kicker: str, variant: str = "info"):
+    items_html = "".join([f"<li>{item}</li>" for item in bullets])
+    st.markdown(
+        f"""
+        <div class="onboarding-panel onboarding-panel--{variant}">
+            <div class="onboarding-panel-kicker">{kicker}</div>
+            <div class="onboarding-panel-title">{title}</div>
+            <div class="onboarding-panel-copy">{body}</div>
+            <ul class="onboarding-panel-list">{items_html}</ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_status_strip(title: str, body: str, icon: str = "ℹ️"):
+    st.markdown(
+        f"""
+        <div class="app-status-strip">
+            <div class="app-status-strip-icon">{icon_badge_html(icon, 'sm')}</div>
+            <div>
+                <div class="app-status-strip-title">{title}</div>
+                <div class="app-status-strip-copy">{body}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_focus_callout(title: str, body: str, variant: str = "info"):
+    st.markdown(
+        f"""
+        <div class="focus-callout focus-callout--{variant}">
+            <div class="focus-callout-title">{title}</div>
+            <div class="focus-callout-copy">{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_summary_list(title: str, bullets: list[str], kicker: str = "Summary"):
+    items_html = "".join([f"<li>{item}</li>" for item in bullets])
+    st.markdown(
+        f"""
+        <div class="summary-list-panel">
+            <div class="summary-list-kicker">{kicker}</div>
+            <div class="summary-list-title">{title}</div>
+            <ul class="summary-list-items">{items_html}</ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_quickstart(help_mode: bool, show_eu_status: bool, scenario: str):
@@ -1127,7 +1562,8 @@ def render_sidebar_summary_card(profile: str, scenario: str, role: str):
     st.markdown(
         f"""
         <div class="sidebar-card">
-            <div class="sidebar-card-title">✨ Demo Navigator</div>
+            <div class="sidebar-kicker">Control center</div>
+            <div class="sidebar-card-title">{icon_badge_html('navigator', 'sm')} <span style='margin-left:0.35rem;'>Demo Navigator</span></div>
             <div class="sidebar-card-copy">Use the icon sections below to pick a scenario, adjust playback, and switch the explanation style for {role}.</div>
             <div class="sidebar-chip-row">
                 <span class="sidebar-chip">{profile.split(' ')[0]}</span>
@@ -1143,7 +1579,39 @@ def render_sidebar_summary_card(profile: str, scenario: str, role: str):
     )
 
 
-def render_funding_acknowledgement():
+def render_sidebar_intro_card(title: str, body: str):
+    st.markdown(
+        f"""
+        <div class="sidebar-card">
+            <div class="sidebar-kicker">Sidebar guide</div>
+            <div class="sidebar-card-title">{title}</div>
+            <div class="sidebar-card-copy">{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_hint(title: str, body: str, variant: str = "neutral"):
+    st.markdown(
+        f"""
+        <div class="sidebar-hint sidebar-hint--{variant}">
+            <div class="sidebar-hint-title">{title}</div>
+            <div class="sidebar-hint-copy">{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _footer_image_src(image_source) -> str:
+    if isinstance(image_source, bytes):
+        encoded = base64.b64encode(image_source).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+    return str(image_source)
+
+
+def render_funding_acknowledgement(compact: bool = False):
     vinnova_logo_bytes: Optional[bytes] = None
     try:
         vinnova_logo_bytes = fetch_logo_bytes(VINNOVA_LOGO_URL)
@@ -1162,30 +1630,95 @@ def render_funding_acknowledgement():
     except Exception:
         aurora_logo_bytes = None
 
-    st.markdown("### Funding acknowledgement")
-    st.markdown(
-        f"This demo hub is supported by **VINNOVA** (Sweden's Innovation Agency), "
-        f"project reference **{PROJECT_REF}**, by **KK-stiftelsen** (The Knowledge Foundation), "
-        f"and by **Interreg Aurora**."
-    )
+    if not compact:
+        st.markdown("### Funding acknowledgement")
+        st.markdown(
+            f"This demo hub is supported by **VINNOVA** (Sweden's Innovation Agency), "
+            f"project reference **{PROJECT_REF}**, by **KK-stiftelsen** (The Knowledge Foundation), "
+            f"and by **Interreg Aurora**."
+        )
+    else:
+        st.markdown(
+            f"<div class='footer-funding-lead'>Supported by <strong>VINNOVA</strong> (project reference <strong>{PROJECT_REF}</strong>), <strong>KK-stiftelsen</strong>, and <strong>Interreg Aurora</strong>.</div>",
+            unsafe_allow_html=True,
+        )
 
     funding_items = [
-        ("VINNOVA", vinnova_logo_bytes or VINNOVA_LOGO_URL, PROJECT_URL, "View VINNOVA project page"),
-        ("KK-stiftelsen", kks_logo_bytes or KKS_LOGO_URL, KKS_URL, "View KKS website"),
-        ("Interreg Aurora", aurora_logo_bytes or AURORA_LOGO_URL, AURORA_URL, "View Interreg Aurora project"),
+        (
+            "VINNOVA",
+            vinnova_logo_bytes or VINNOVA_LOGO_URL,
+            PROJECT_URL,
+            "View VINNOVA project",
+            "Sweden's Innovation Agency supporting the project showcase and research context.",
+        ),
+        (
+            "KK-stiftelsen",
+            kks_logo_bytes or KKS_LOGO_URL,
+            KKS_URL,
+            "View KKS website",
+            "Research funding support for knowledge-building and trustworthy AI demonstration work.",
+        ),
+        (
+            "Interreg Aurora",
+            aurora_logo_bytes or AURORA_LOGO_URL,
+            AURORA_URL,
+            "View Aurora project",
+            "Cross-border innovation support connected to regional digital resilience and collaboration.",
+        ),
     ]
 
+    if compact:
+        cards_html = "".join(
+            [
+                dedent(
+                    f"""
+                    <div class="footer-sponsor-card">
+                        <div>
+                            <div class="footer-sponsor-title">{label}</div>
+                            <div class="footer-sponsor-copy">{copy}</div>
+                            <img class="footer-sponsor-logo" src="{_footer_image_src(image_source)}" alt="{label} logo" />
+                        </div>
+                        <a class="footer-sponsor-link" href="{link_url}" target="_blank" rel="noopener noreferrer">{button_text}</a>
+                    </div>
+                    """
+                ).strip()
+                for label, image_source, link_url, button_text, copy in funding_items
+            ]
+        )
+        st.markdown(f"<div class='footer-sponsor-grid'>{cards_html}</div>", unsafe_allow_html=True)
+        return
+
     columns = st.columns(3)
-    for column, (label, image_source, link_url, button_text) in zip(columns, funding_items):
+    for column, (label, image_source, link_url, button_text, copy) in zip(columns, funding_items):
         with column:
             with st.container(border=True):
-                st.image(image_source)
+                st.image(image_source, width=170)
+                st.caption(copy)
                 st.link_button(button_text, link_url, use_container_width=True)
                 st.caption(label)
 
 
 def render_footerline():
-    st.caption("Trustworthy AI Demo Hub — Developed and maintained by Kyi Thar • Contact: kyi.thar@miun.se")
+    st.markdown(
+        "<div class='footer-contact-line'><small>Trustworthy AI Demo Hub — Developed and maintained by Kyi Thar • Contact: kyi.thar@miun.se</small></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_footer():
+    st.markdown(
+        """
+        <div class="app-footer">
+            <div class="app-footer-title">Project funding and contact</div>
+            <div class="app-footer-copy">
+                A compact presentation footer for Streamlit Cloud so project acknowledgement, sponsor links, and contact details remain visible without taking over the page.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    render_funding_acknowledgement(compact=True)
+    render_footerline()
 
 
 def render_scenario_context(scenario: str):

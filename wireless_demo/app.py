@@ -10,6 +10,12 @@ from .ux import (
     ROLE_TAB_ORDER,
     TAB_DISPLAY_LABELS,
     inject_global_styles,
+    render_app_footer,
+    render_disclaimer_banner,
+    render_onboarding_panel,
+    render_sidebar_hint,
+    render_sidebar_intro_card,
+    render_status_strip,
     render_sidebar_summary_card,
     sidebar_role_copy,
 )
@@ -33,15 +39,17 @@ def _apply_pending_home_actions():
 
 def _render_first_open_welcome():
     def render_prompt_body():
-        st.markdown(
-            "### Welcome to the demo\n"
-            "Start with the **⌂ Home** tab to pick a scenario, choose an audience view, and understand the story of the demo before exploring the detailed tabs."
-        )
-        st.markdown(
-            "- **Home:** quick icon-style choices for scenario, role, and next step.  \n"
-            "- **Overview:** live wireless posture and fleet risk.  \n"
-            "- **Incidents:** alert triage with human review actions.  \n"
-            "- **Insights / Governance:** model explanation and trust controls."
+        render_onboarding_panel(
+            title="Welcome to the demo",
+            body="Start with the Home tab to pick a scenario, choose an audience view, and understand the demo story before opening the detailed workspaces.",
+            bullets=[
+                "Home guides scenario selection, audience mode, and next-step navigation.",
+                "Overview shows live wireless posture and fleet risk.",
+                "Incidents supports alert triage and human review actions.",
+                "Insights and Governance explain model behavior and trust controls.",
+            ],
+            kicker="Getting started",
+            variant="info",
         )
         cols = st.columns(2)
         if cols[0].button("Got it", key="welcome_dismiss", use_container_width=True):
@@ -52,21 +60,22 @@ def _render_first_open_welcome():
             st.session_state.training_prompt_dismissed = False
             st.rerun()
 
-    with st.container(border=True):
-        st.info("New here? Start with the Home tab for the guided demo path.")
+    with st.container():
         render_prompt_body()
 
 
 def _render_initial_training_prompt():
     def render_prompt_body():
-        st.markdown(
-            "### Open model setup guide\n"
-            "This demo needs its anomaly detector and attack-type classifier before it can generate alerts, explanations, and transparency views."
-        )
-        st.markdown(
-            "- **Binary detector:** learns normal vs anomalous device behavior.  \n"
-            "- **Attack typing:** learns Jamming, Breach, Spoofing, and Tamper classification.  \n"
-            "- **Transparency views:** global importance, calibration, and governance become available after training."
+        render_onboarding_panel(
+            title="Open model setup guide",
+            body="This demo needs its anomaly detector and attack-type classifier before it can generate alerts, explanations, and transparency views.",
+            bullets=[
+                "Binary detector learns normal vs anomalous device behavior.",
+                "Attack typing learns Jamming, Breach, Spoofing, and Tamper classification.",
+                "Transparency views unlock global importance, calibration, and governance context after training.",
+            ],
+            kicker="Setup required",
+            variant="warning",
         )
         action_cols = st.columns(2)
         if action_cols[0].button("Start model setup", key="initial_train_now", use_container_width=True):
@@ -77,8 +86,7 @@ def _render_initial_training_prompt():
             st.session_state.training_prompt_dismissed = True
             st.rerun()
 
-    with st.container(border=True):
-        st.warning("Model setup is required before the demo can stream incidents.")
+    with st.container():
         render_prompt_body()
 
 
@@ -176,23 +184,16 @@ def main():
 
     st.set_page_config(page_title="TRUST AI — Wireless Threats (Sundsvall)", layout="wide")
     inject_global_styles()
-    st.warning(
-        "Disclaimer: This demo is intended solely for educational purposes."
-        " It is provided as a demonstration of concept or functionality and should not be used for commercial, production, or operational deployment."
-        " All content, data, and examples used in this demo are for learning and research purposes only."
-        " The authors or presenters assume no responsibility for any misuse or unintended application of this material.",
-        icon="⚠️",
-    )
+    render_disclaimer_banner()
 
     with st.sidebar:
-        st.header("Demo Controls")
-        st.caption("Configure the scenario, playback, model behavior, and audience view.")
         sidebar_copy = sidebar_role_copy(st.session_state.get("role_selector_preview", "AI Builder"))
         profile = st.session_state.get("cellular_mode")
         current_profile_label = "Road" if profile else "Yard"
+        render_sidebar_intro_card("Demo controls", "Configure the scenario, playback, model behavior, and audience view from one place.")
         render_sidebar_summary_card(current_profile_label, st.session_state.get("scenario_selector", "Normal"), st.session_state.get("role_selector_preview", "AI Builder"))
-        st.info(sidebar_copy["controls"])
-        with st.expander("🧭 Scenario setup", expanded=True):
+        render_sidebar_hint("Current guidance", sidebar_copy["controls"], variant="info")
+        with st.expander("Scenario setup", expanded=True):
             profile = st.selectbox(
                 "Comms profile",
                 ["Yard (Wi-Fi/private-5G dominant)", "Road (Cellular 5G/LTE dominant)"],
@@ -206,7 +207,7 @@ def main():
                 index=0,
                 key="scenario_selector",
             )
-            st.caption(sidebar_copy["scenario"])
+            render_sidebar_hint("Scenario focus", sidebar_copy["scenario"])
 
             if scenario.startswith("Jamming"):
                 st.radio("Jamming type", ["Broadband noise", "Reactive", "Burst interference"], index=0, key="jam_mode")
@@ -229,24 +230,25 @@ def main():
                     key="tamper_mode",
                 )
 
-        with st.expander("⏯ Playback", expanded=False):
+        with st.expander("Playback", expanded=False):
             speed = st.slider("Playback speed (ticks/refresh)", 1, 10, 3)
             auto = st.checkbox("Auto stream", True)
             refresh_ms = st.slider("Auto refresh cadence (ms)", 300, 3000, 1200, 100, disabled=not auto)
             reset = st.button("Reset session", use_container_width=True)
+            render_sidebar_hint("Playback tip", "Use slower cadence for presentations and faster cadence when you want incidents to populate quickly.")
 
-        with st.expander("🧠 Model behavior", expanded=False):
+        with st.expander("Model behavior", expanded=False):
             use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True)
             threshold_value = st.slider("Incident threshold (model prob.)", 0.30, 0.95, CFG.threshold, 0.01, key="th_slider")
             CFG.threshold = threshold_value
             if st.session_state.get("suggested_threshold") is not None:
                 if st.button(f"Apply suggested threshold ({st.session_state.suggested_threshold:.2f})", use_container_width=True):
                     st.session_state.th_slider = float(st.session_state.suggested_threshold)
-            st.caption("Alerts fire when probability ≥ threshold; p-value refines severity if enabled.")
-            st.caption(sidebar_copy["model"])
+            render_sidebar_hint("Model behavior", "Alerts fire when probability ≥ threshold; p-value refines severity if enabled.")
+            render_sidebar_hint("Role guidance", sidebar_copy["model"])
             retrain = st.button("Run model setup / refresh", use_container_width=True)
 
-        with st.expander("👥 HITL policy", expanded=False):
+        with st.expander("HITL policy", expanded=False):
             st.checkbox(
                 "Suppress repeat false positives",
                 value=st.session_state.get("hitl_suppression_enabled", CFG.hitl_suppression_enabled),
@@ -268,9 +270,9 @@ def main():
                 0.05,
                 key="hitl_escalation_boost",
             )
-            st.caption("These controls change how prior human reviews influence duplicate suppression and triage ordering.")
+            render_sidebar_hint("Policy effect", "These controls change how prior human reviews influence duplicate suppression and triage ordering.")
 
-        with st.expander("🎛 Display and audience", expanded=False):
+        with st.expander("Display and audience", expanded=False):
             show_map = st.checkbox("Show geospatial map", True)
             show_heatmap = st.checkbox("Show fleet heatmap (metric z-scores)", True)
             type_filter = st.multiselect("Show device types", DEVICE_TYPES, default=DEVICE_TYPES)
@@ -281,12 +283,12 @@ def main():
                 key="role_selector_preview",
             )
             sidebar_copy = sidebar_role_copy(role)
-            st.caption(sidebar_copy["display"])
+            render_sidebar_hint("Display guidance", sidebar_copy["display"])
 
-        with st.expander("💡 Guidance", expanded=False):
+        with st.expander("Guidance", expanded=False):
             help_mode = st.checkbox("Help mode (inline hints)", True)
             show_eu_status = st.checkbox("Show EU AI Act status banner", True)
-            st.caption(sidebar_copy["guidance"])
+            render_sidebar_hint("When to use this", sidebar_copy["guidance"])
             if st.button("Open model setup guide", use_container_width=True):
                 st.session_state.training_prompt_dismissed = False
                 st.rerun()
@@ -331,9 +333,12 @@ def main():
         artifact_source = st.session_state.model_artifact_source
         trained_at = artifacts.get("trained_at")
         trained_note = f" (saved at {trained_at})" if trained_at else ""
-        if artifact_source == "Bundled startup cache":
-            st.caption("📦 Startup cache loaded from the bundled model artifact.")
-        st.info(f"Loaded cached model{trained_note} — no setup refresh needed. Use **Run model setup / refresh** to rebuild the models if required.")
+        title = "Bundled startup cache loaded" if artifact_source == "Bundled startup cache" else "Cached model loaded"
+        render_status_strip(
+            title=title,
+            body=f"Loaded cached model{trained_note}. No setup refresh is needed unless you want to rebuild the models from scratch.",
+            icon="cache" if artifact_source == "Bundled startup cache" else "ready",
+        )
         st.session_state.training_prompt_dismissed = False
 
     if retrain or (CFG.retrain_on_start and st.session_state.get("model") is None and MODEL_KEY not in store):
@@ -361,3 +366,4 @@ def main():
         show_heatmap=show_heatmap,
         profile=profile,
     )
+    render_app_footer()

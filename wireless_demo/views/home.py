@@ -7,10 +7,9 @@ from ..attack_education import render_attack_academy
 from ..training import train_model_with_progress
 from ..ux import (
     SCENARIO_COPY,
+    icon_badge_html,
     metric_role_copy,
     render_demo_storyline,
-    render_footerline,
-    render_funding_acknowledgement,
     render_header,
     render_model_status_card,
     render_quickstart,
@@ -45,26 +44,26 @@ ROLE_HOME_COPY = {
 
 
 QUICK_PATHS = [
-    ("🛰️", "Overview", "See the live posture of the fleet and current risk pattern.", "Live monitoring"),
-    ("🚨", "Incidents", "Review alerts, evidence, and human decisions.", "Triage queue"),
-    ("🧠", "Insights", "Understand the model logic and confidence checks.", "Explain AI"),
-    ("🛡️", "Governance", "Review oversight, auditability, and trustworthy AI concepts.", "Trust controls"),
+    ("overview", "Overview", "See the live posture of the fleet and current risk pattern.", "Live monitoring"),
+    ("incidents", "Incidents", "Review alerts, evidence, and human decisions.", "Triage queue"),
+    ("insights", "Insights", "Understand the model logic and confidence checks.", "Explain AI"),
+    ("governance", "Governance", "Review oversight, auditability, and trustworthy AI concepts.", "Trust controls"),
 ]
 
 SCENARIO_BUTTONS = [
-    ("🟢", "Normal", "Baseline"),
-    ("📡", "Jamming (localized)", "RF interference"),
-    ("📶", "Access Breach (AP/gNB)", "Access attack"),
-    ("🛰️", "GPS Spoofing (subset)", "Location attack"),
-    ("🧾", "Data Tamper (gateway)", "Integrity issue"),
+    ("normal", "Normal", "Baseline"),
+    ("jamming", "Jamming (localized)", "RF interference"),
+    ("breach", "Access Breach (AP/gNB)", "Access attack"),
+    ("spoofing", "GPS Spoofing (subset)", "Location attack"),
+    ("tamper", "Data Tamper (gateway)", "Integrity issue"),
 ]
 
 ROLE_BUTTONS = [
-    ("👤", "End User", "Simple guided view"),
-    ("🧪", "Domain Expert", "Operational analyst"),
-    ("🏛️", "Regulator", "Assurance view"),
-    ("🤖", "AI Builder", "Technical view"),
-    ("📊", "Executive", "Leadership summary"),
+    ("end_user", "End User", "Simple guided view"),
+    ("domain_expert", "Domain Expert", "Operational analyst"),
+    ("regulator", "Regulator", "Assurance view"),
+    ("ai_builder", "AI Builder", "Technical view"),
+    ("executive", "Executive", "Leadership summary"),
 ]
 
 PROJECT_SUMMARY_CARDS = [
@@ -91,7 +90,7 @@ def _render_card(icon, title, copy, chip=None):
     st.markdown(
         f"""
         <div class="home-card">
-            <div class="home-card-icon">{icon}</div>
+            <div class="home-card-icon">{icon_badge_html(icon, 'md')}</div>
             <div class="home-card-title">{title}</div>
             <div class="home-card-copy">{copy}</div>
             {chip_html}
@@ -106,7 +105,7 @@ def _render_icon_tile(icon, title, copy, caption=None):
     st.markdown(
         f"""
         <div class="home-icon-tile">
-            <div class="home-icon-badge">{icon}</div>
+            <div class="home-icon-badge">{icon_badge_html(icon, 'lg')}</div>
             <div class="home-icon-label">{title}</div>
             <div class="home-icon-copy">{copy}</div>
             {caption_html}
@@ -262,7 +261,14 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
                     "- Packages the workflow into a role-aware project demo for operations, research, and assurance audiences."
                 )
         with top_right:
-            _render_card("📍", scenario, scenario_copy["summary"], chip=f"Watch for: {scenario_copy['signals']}")
+            scenario_icon = {
+                "Normal": "normal",
+                "Jamming (localized)": "jamming",
+                "Access Breach (AP/gNB)": "breach",
+                "GPS Spoofing (subset)": "spoofing",
+                "Data Tamper (gateway)": "tamper",
+            }.get(scenario, "scenario")
+            _render_card(scenario_icon, scenario, scenario_copy["summary"], chip=f"Watch for: {scenario_copy['signals']}")
 
     with _section_container("Start here", compact_mode, expanded=not st.session_state.get("model") is not None):
         render_section_card(
@@ -273,11 +279,11 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         st.markdown("<div class='home-section-note'>Pick a scenario, choose an audience view, then move to the tab that matches your goal.</div>", unsafe_allow_html=True)
         explainer_cols = st.columns(3)
         with explainer_cols[0]:
-            _render_card("1️⃣", "Pick a scenario", "Choose the threat story you want to demonstrate.")
+            _render_card("step_1", "Pick a scenario", "Choose the threat story you want to demonstrate.")
         with explainer_cols[1]:
-            _render_card("2️⃣", "Pick a view", "Switch the explanation style for the audience in front of you.")
+            _render_card("step_2", "Pick a view", "Switch the explanation style for the audience in front of you.")
         with explainer_cols[2]:
-            _render_card("3️⃣", "Open a tab", "Go to Overview, Incidents, Insights, or Governance next.")
+            _render_card("step_3", "Open a tab", "Go to Overview, Incidents, Insights, or Governance next.")
 
     with _section_container("Quick scenario selection", compact_mode):
         render_section_card(
@@ -330,7 +336,7 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         )
         setup_cols = st.columns([1, 2])
         with setup_cols[0]:
-            if st.button("⚙️ Run model setup", key="home_train_model", use_container_width=True):
+            if st.button("Run model setup", key="home_train_model", use_container_width=True):
                 st.session_state.training_prompt_dismissed = True
                 train_model_with_progress(n_ticks=350)
                 st.session_state.home_message = "Model setup completed. You can now use the live monitoring tabs."
@@ -338,15 +344,6 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         with setup_cols[1]:
             with st.container(border=True):
                 st.info("Run model setup when you want fresh model artifacts, updated thresholds, and full transparency views.")
-
-    with _section_container("Project context", compact_mode):
-        render_section_card(
-            "Project context",
-            "This demo is supported by public and research funding partners. Use these links when you want to acknowledge the project context behind the work.",
-            kicker="Acknowledgement",
-        )
-        render_funding_acknowledgement()
-        render_footerline()
 
     if st.session_state.get("home_message"):
         st.success(st.session_state.home_message)

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from .ux import icon_badge_html
+
 
 ATTACK_KNOWLEDGE = {
     "Normal": {
-        "icon": "🟢",
+        "icon": "normal",
         "title": "Normal baseline",
         "what": "This is the healthy reference case. Devices still show variation, but the pattern stays within expected RF, GNSS, access, and integrity behavior.",
         "analogy": "Think of this as a normal operating day: some noise and motion, but no coordinated threat pattern.",
@@ -19,7 +21,7 @@ ATTACK_KNOWLEDGE = {
         "limits": "Normal does not mean perfect; it is still synthetic and simpler than real industrial operations.",
     },
     "Jamming": {
-        "icon": "📡",
+        "icon": "jamming",
         "title": "Jamming",
         "what": "Jamming is deliberate interference that makes legitimate wireless communication harder or impossible.",
         "analogy": "It is like trying to talk in a room where someone is blasting loud noise over everyone else.",
@@ -33,7 +35,7 @@ ATTACK_KNOWLEDGE = {
         "limits": "This is a simplified radio model. It does not simulate protocol-specific waveform behavior, adaptive coding responses, or hardware-specific antenna effects.",
     },
     "Access Breach": {
-        "icon": "📶",
+        "icon": "breach",
         "title": "Access breach",
         "what": "An access breach covers attacks on association, authentication, or infrastructure trust, such as rogue AP/gNB behavior, credential abuse, or deauth-style disruption.",
         "analogy": "It is like a fake entrance or checkpoint tricking users into connecting to the wrong place or repeatedly kicking them back out.",
@@ -47,7 +49,7 @@ ATTACK_KNOWLEDGE = {
         "limits": "The model combines Wi-Fi and cellular access symptoms into one educational scenario, so it is broader than a real protocol-specific test plan.",
     },
     "GPS Spoofing": {
-        "icon": "🛰️",
+        "icon": "spoofing",
         "title": "GPS spoofing",
         "what": "GPS spoofing means feeding a receiver false satellite-like signals so it computes the wrong position or time.",
         "analogy": "It is like giving someone a convincing but fake map and clock so they believe they are somewhere else.",
@@ -61,7 +63,7 @@ ATTACK_KNOWLEDGE = {
         "limits": "The GNSS behavior is educational rather than physics-accurate; it does not emulate actual satellite constellations, receiver tracking loops, or navigation filters.",
     },
     "Data Tamper": {
-        "icon": "🧾",
+        "icon": "tamper",
         "title": "Data tamper",
         "what": "Data tampering means altering payloads or message streams so the receiving system sees corrupted, replayed, biased, or malformed information.",
         "analogy": "It is like editing a report in transit so the numbers, timestamps, or units no longer match reality.",
@@ -96,7 +98,10 @@ def _audience_depth(role: str) -> str:
 def _render_attack_card(family: str, role: str):
     attack = ATTACK_KNOWLEDGE[family]
     depth = _audience_depth(role)
-    st.markdown(f"### {attack['icon']} {attack['title']}")
+    st.markdown(
+        f"<div class='inline-icon-heading'>{icon_badge_html(attack['icon'], 'sm')}<div class='inline-icon-heading-title'>{attack['title']}</div></div>",
+        unsafe_allow_html=True,
+    )
     st.markdown(f"**What it is:** {attack['what']}")
     st.caption(attack["analogy"])
     st.markdown(f"**Why it matters:** {attack['why_it_matters']}")
@@ -117,7 +122,7 @@ def render_attack_academy(role: str, selected_scenario: str | None = None):
     chosen_family = scenario_family_name(selected_scenario) if selected_scenario else None
     for family in ORDERED_FAMILIES:
         expanded = family == chosen_family
-        with st.expander(f"{ATTACK_KNOWLEDGE[family]['icon']} {ATTACK_KNOWLEDGE[family]['title']}", expanded=expanded):
+        with st.expander(f"{ATTACK_KNOWLEDGE[family]['title']}", expanded=expanded):
             _render_attack_card(family, role)
 
 
@@ -128,7 +133,7 @@ def render_current_attack_brief(scenario: str, role: str, title: str = "Current 
     st.markdown(
         f"""
         <div class="section-card">
-            <div class="summary-kicker">{attack['icon']} {attack['title']}</div>
+            <div class="summary-kicker">{attack['title']}</div>
             <div class="summary-value">{scenario}</div>
             <div class="summary-copy"><strong>What it is:</strong> {attack['what']}</div>
             <div class="summary-copy" style="margin-top:0.35rem;"><strong>Watch for:</strong> {', '.join(attack['watch_for'][:2])}</div>
