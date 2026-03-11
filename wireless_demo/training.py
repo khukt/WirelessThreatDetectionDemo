@@ -282,6 +282,7 @@ def train_model_with_progress(n_ticks=350):
         colsample_bytree=0.9,
         min_child_samples=12,
         force_col_wise=True,
+        verbosity=-1,
         random_state=SEED,
         scale_pos_weight=scale_pos_weight,
     )
@@ -344,6 +345,7 @@ def train_model_with_progress(n_ticks=350):
             learning_rate=0.08,
             subsample=0.9,
             colsample_bytree=0.9,
+            verbosity=-1,
             random_state=SEED,
         )
         type_clf.fit(X_tr_t, y_tr_t, sample_weight=sw_tr)

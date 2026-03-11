@@ -1,6 +1,5 @@
 import warnings
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
 from .config import CFG, DEVICE_TYPES, MODEL_KEY
 from .logic import tick_once
@@ -115,6 +114,39 @@ def _reset_simulation_if_context_changed(scenario, cellular_mode):
         st.session_state._active_scenario = scenario
         st.session_state._active_cellular_mode = cellular_mode
         st.session_state.context_change_message = f"Simulation reset for {scenario} in {'Road' if cellular_mode else 'Yard'} mode."
+
+
+def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role, help_mode, show_eu_status, show_map, type_filter, show_heatmap, profile):
+    refresh_interval = refresh_ms / 1000 if auto and st.session_state.get("model") is not None else None
+
+    @st.fragment(run_every=refresh_interval)
+    def render_live_workflow_fragment():
+        if st.session_state.get("model") is not None:
+            if auto:
+                for _ in range(speed):
+                    tick_once(scenario, use_conformal)
+            elif st.button("Step once"):
+                tick_once(scenario, use_conformal)
+
+        if st.session_state.get("model") is None:
+            st.warning("Model setup has not been run yet. Start with the Home tab or use **Run model setup / refresh** in the sidebar.")
+        else:
+            st.caption("Use the Home tab for onboarding, or jump directly into the live workflow tabs below.")
+
+        tab_order = ROLE_TAB_ORDER.get(role, ROLE_TAB_ORDER["End User"])
+        tab_renderers = {
+            "Home": lambda: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
+            "Overview": lambda: render_overview_tab(scenario, show_map, type_filter, use_conformal, role),
+            "Fleet View": lambda: render_fleet_tab(show_heatmap, role),
+            "Incidents": lambda: render_incidents_tab(role),
+            "Insights": lambda: render_insights_tab(role),
+            "Governance": lambda: render_governance_tab(role),
+        }
+
+        selected_tab = _render_primary_navigation(tab_order)
+        tab_renderers[selected_tab]()
+
+    render_live_workflow_fragment()
 
 
 def main():
@@ -258,7 +290,7 @@ def main():
     if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY not in store):
         disk_artifacts = load_model_artifacts(MODEL_KEY)
         if disk_artifacts is not None:
-            disk_artifacts["artifact_source"] = "Disk cache"
+            disk_artifacts["artifact_source"] = disk_artifacts.get("artifact_source", "Disk cache")
             store[MODEL_KEY] = disk_artifacts
 
     if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY in store):
@@ -295,30 +327,17 @@ def main():
     ):
         _render_initial_training_prompt()
 
-    if st.session_state.get("model") is not None:
-        if auto:
-            for _ in range(speed):
-                tick_once(scenario, use_conformal)
-        elif st.button("Step once"):
-            tick_once(scenario, use_conformal)
-
-    if st.session_state.get("model") is None:
-        st.warning("Model setup has not been run yet. Start with the Home tab or use **Run model setup / refresh** in the sidebar.")
-    else:
-        st.caption("Use the Home tab for onboarding, or jump directly into the live workflow tabs below.")
-
-    tab_order = ROLE_TAB_ORDER.get(role, ROLE_TAB_ORDER["End User"])
-    tab_renderers = {
-        "Home": lambda: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
-        "Overview": lambda: render_overview_tab(scenario, show_map, type_filter, use_conformal, role),
-        "Fleet View": lambda: render_fleet_tab(show_heatmap, role),
-        "Incidents": lambda: render_incidents_tab(role),
-        "Insights": lambda: render_insights_tab(role),
-        "Governance": lambda: render_governance_tab(role),
-    }
-
-    selected_tab = _render_primary_navigation(tab_order)
-    tab_renderers[selected_tab]()
-
-    if st.session_state.get("model") is not None and auto:
-        st_autorefresh(interval=refresh_ms, key="demo_auto_stream_refresh")
+    _render_live_workflow(
+        refresh_ms=refresh_ms,
+        auto=auto,
+        speed=speed,
+        scenario=scenario,
+        use_conformal=use_conformal,
+        role=role,
+        help_mode=help_mode,
+        show_eu_status=show_eu_status,
+        show_map=show_map,
+        type_filter=type_filter,
+        show_heatmap=show_heatmap,
+        profile=profile,
+    )
