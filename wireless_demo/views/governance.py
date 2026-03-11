@@ -3,7 +3,7 @@ import pandas as pd
 
 from ..hitl import current_hitl_policy, incident_review_key, review_rows
 from ..training import render_training_explainer
-from ..ux import render_section_card, render_tab_intro
+from ..ux import render_footerline, render_funding_acknowledgement, render_section_card, render_tab_intro
 
 
 ROLE_GOVERNANCE_CALLOUT = {
@@ -262,3 +262,11 @@ def render_governance_tab(role):
         kicker="Reference detail",
     )
     render_training_explainer(nonce)
+
+    render_section_card(
+        "Project context",
+        "This demo is supported by public and research funding partners. Include this section when presenting the assurance, research, and project context around the work.",
+        kicker="Acknowledgement",
+    )
+    render_funding_acknowledgement()
+    render_footerline()

@@ -1,7 +1,9 @@
+import base64
 import time
 from textwrap import dedent
 from typing import Optional
 
+import requests
 import streamlit as st
 
 
@@ -215,6 +217,17 @@ ROLE_METRIC_COPY = {
     },
 }
 
+PROJECT_URL = "https://www.vinnova.se/en/p/trustworthy-ai-and-mobile-generative-ai-for-6g-networks-and-smart-industry-applications/"
+PROJECT_REF = "2024-03570"
+VINNOVA_LOGO_URL = (
+    "https://www.vinnova.se/globalassets/mikrosajter/nyhetsrum/bilder/logotyp/"
+    "vinnova_green_payoff_eng_rgb.png"
+)
+KKS_URL = "https://www.kks.se/"
+KKS_LOGO_URL = "https://cdn-assets-cloud.frontify.com/s3/frontify-cloud-files-us/eyJwYXRoIjoiZnJvbnRpZnlcL2FjY291bnRzXC8zYVwvMjMxNjAwXC9wcm9qZWN0c1wvMzI5NjQzXC9hc3NldHNcLzY4XC82NDI3MTMxXC8xMDViMjlhNjRlZTkyNDhmZjljZTFhY2M2MzIyN2JmZi0xNjQ4Nzk2NDM1LnBuZyJ9:frontify:UwA956mBpIj76Iqr95OIrjj07Wb0ztxt1lHlwfBpH8Y"
+AURORA_URL = "https://www.miun.se/en/Research/research-projects/ongoing-research-projects/trust---enhancing-wireless-communication--sensing-with-secure-resilient-and-trustworthy-solutions/"
+AURORA_LOGO_URL = "https://www.interregaurora.eu/wp-content/uploads/AURORA-RGB-Color-1-1024x308.png"
+
 
 def render_section_card(title: str, copy: str, kicker: str = "Section"):
     st.markdown(
@@ -247,6 +260,27 @@ def style_plotly_figure(fig, title: Optional[str] = None, height: Optional[int] 
     fig.update_xaxes(showgrid=True, gridcolor="rgba(226,232,240,0.65)", zeroline=False)
     fig.update_yaxes(showgrid=True, gridcolor="rgba(226,232,240,0.65)", zeroline=False)
     return fig
+
+
+@st.cache_data(show_spinner=False, ttl=86400)
+def fetch_logo_bytes(url: str) -> Optional[bytes]:
+    response = requests.get(url, timeout=15)
+    response.raise_for_status()
+    return response.content
+
+
+def logo_src(url: str, logo_bytes: Optional[bytes]) -> str:
+    if not logo_bytes:
+        return url
+    lower_url = url.lower()
+    if lower_url.endswith(".svg"):
+        mime = "image/svg+xml"
+    elif lower_url.endswith(".jpg") or lower_url.endswith(".jpeg"):
+        mime = "image/jpeg"
+    else:
+        mime = "image/png"
+    encoded = base64.b64encode(logo_bytes).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
 
 
 def inject_global_styles():
@@ -743,6 +777,95 @@ def inject_global_styles():
             font-size: 0.72rem;
             font-weight: 700;
         }
+        .sidebar-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: 0.4rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .sidebar-status-pill--ready {
+            background: rgba(22, 163, 74, 0.10);
+            color: #15803d;
+            border-color: rgba(22, 163, 74, 0.18);
+        }
+        .sidebar-status-pill--fresh {
+            background: rgba(37, 99, 235, 0.10);
+            color: #1d4ed8;
+            border-color: rgba(37, 99, 235, 0.18);
+        }
+        .sidebar-status-pill--idle {
+            background: rgba(71, 85, 105, 0.10);
+            color: #475569;
+            border-color: rgba(71, 85, 105, 0.18);
+        }
+        .fundingWrap {
+            text-align: center;
+            margin: 1.2rem 0 0.75rem;
+        }
+        .fundingTitle {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: rgba(15, 23, 42, 0.98);
+            margin-bottom: 0.35rem;
+        }
+        .fundingText {
+            font-size: 0.92rem;
+            color: rgba(49, 51, 63, 0.78);
+            line-height: 1.5;
+        }
+        .fundingGrid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
+            margin: 0.8rem 0 1.1rem;
+        }
+        .fundingItem {
+            border: 1px solid rgba(49, 51, 63, 0.10);
+            border-radius: 18px;
+            padding: 0.9rem 0.8rem;
+            background: rgba(255,255,255,0.78);
+            text-align: center;
+        }
+        .fundingLogoSlot {
+            min-height: 88px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fundingLogo {
+            max-width: 100%;
+            max-height: 56px;
+            object-fit: contain;
+        }
+        .fundingLogo.aurora {
+            max-height: 48px;
+        }
+        .fundingLink a {
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .fundingLink a:hover {
+            text-decoration: underline;
+        }
+        .footerline {
+            margin: 1rem 0 0.4rem;
+            padding-top: 0.9rem;
+            border-top: 1px solid rgba(49, 51, 63, 0.10);
+            text-align: center;
+            font-size: 0.88rem;
+            color: rgba(49, 51, 63, 0.72);
+        }
+        @media (max-width: 900px) {
+            .fundingGrid {
+                grid-template-columns: 1fr;
+            }
+        }
         .stTabs [data-baseweb="tab-list"] {
             gap: 0.35rem;
             background: rgba(15, 23, 42, 0.05);
@@ -931,6 +1054,12 @@ def render_sidebar_summary_card(profile: str, scenario: str, role: str):
     scenario_copy = SCENARIO_COPY.get(scenario, SCENARIO_COPY["Normal"])
     model = st.session_state.get("model")
     source = st.session_state.get("model_artifact_source") or "Not trained"
+    status_variant = "idle"
+    if source in {"Bundled startup cache", "Writable disk cache", "Disk cache"}:
+        status_variant = "ready"
+    elif source in {"Fresh training", "Memory cache", "Current session"}:
+        status_variant = "fresh"
+    source_text = source if model is not None else "Setup required"
     st.markdown(
         f"""
         <div class="sidebar-card">
@@ -942,11 +1071,94 @@ def render_sidebar_summary_card(profile: str, scenario: str, role: str):
                 <span class="sidebar-chip">{role}</span>
             </div>
             <div class="sidebar-card-copy" style="margin-top:0.55rem;"><strong>Current focus:</strong> {scenario_copy['signals']}</div>
-            <div class="sidebar-card-copy" style="margin-top:0.35rem;"><strong>Model:</strong> {source if model is not None else 'Setup required'}</div>
+            <div class="sidebar-card-copy" style="margin-top:0.35rem;"><strong>Model:</strong></div>
+            <div class="sidebar-status-pill sidebar-status-pill--{status_variant}">{source_text}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_funding_acknowledgement():
+        vinnova_logo_bytes: Optional[bytes] = None
+        try:
+                vinnova_logo_bytes = fetch_logo_bytes(VINNOVA_LOGO_URL)
+        except Exception:
+                vinnova_logo_bytes = None
+
+        kks_logo_bytes: Optional[bytes] = None
+        try:
+                kks_logo_bytes = fetch_logo_bytes(KKS_LOGO_URL)
+        except Exception:
+                kks_logo_bytes = None
+
+        aurora_logo_bytes: Optional[bytes] = None
+        try:
+                aurora_logo_bytes = fetch_logo_bytes(AURORA_LOGO_URL)
+        except Exception:
+                aurora_logo_bytes = None
+
+        vinnova_logo_src = logo_src(VINNOVA_LOGO_URL, vinnova_logo_bytes)
+        kks_logo_src = logo_src(KKS_LOGO_URL, kks_logo_bytes)
+        aurora_logo_src = logo_src(AURORA_LOGO_URL, aurora_logo_bytes)
+
+        st.markdown(
+                f"""
+                <div class="fundingWrap">
+                    <div class="fundingTitle">Funding acknowledgement</div>
+                    <div class="fundingText">
+                        This demo hub is supported by <b>VINNOVA</b> (Sweden's Innovation Agency),
+                        Project reference: <b>{PROJECT_REF}</b>, by <b>KK-stiftelsen</b> (The Knowledge Foundation),
+                        and by <b>Interreg Aurora</b>.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+        st.markdown(
+                f"""
+                <div class="fundingGrid">
+                    <div class="fundingItem">
+                        <div class="fundingLogoSlot">
+                            <img class="fundingLogo vinnova" src="{vinnova_logo_src}" alt="VINNOVA logo" />
+                        </div>
+                        <div class="fundingText fundingLink" style="margin-top:8px;">
+                            <a href="{PROJECT_URL}" target="_blank">View VINNOVA project page →</a>
+                        </div>
+                    </div>
+
+                    <div class="fundingItem">
+                        <div class="fundingLogoSlot">
+                            <img class="fundingLogo kks" src="{kks_logo_src}" alt="KKS logo" />
+                        </div>
+                        <div class="fundingText fundingLink" style="margin-top:8px;">
+                            <a href="{KKS_URL}" target="_blank">View KKS website →</a>
+                        </div>
+                    </div>
+
+                    <div class="fundingItem">
+                        <div class="fundingLogoSlot">
+                            <img class="fundingLogo aurora" src="{aurora_logo_src}" alt="Interreg Aurora logo" />
+                        </div>
+                        <div class="fundingText fundingLink" style="margin-top:8px;">
+                            <a href="{AURORA_URL}" target="_blank">View Interreg Aurora project →</a>
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+
+
+def render_footerline():
+        st.markdown(
+                """
+                <div class="footerline">
+                    Trustworthy AI Demo Hub — Developed and maintained by Kyi Thar • Contact: kyi.thar@miun.se
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
 
 
 def render_scenario_context(scenario: str):

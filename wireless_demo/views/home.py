@@ -9,6 +9,8 @@ from ..ux import (
     SCENARIO_COPY,
     metric_role_copy,
     render_demo_storyline,
+    render_footerline,
+    render_funding_acknowledgement,
     render_header,
     render_model_status_card,
     render_quickstart,
@@ -272,6 +274,15 @@ def render_home_tab(role, scenario, profile, help_mode, show_eu_status):
         with setup_cols[1]:
             with st.container(border=True):
                 st.info("Run model setup when you want fresh model artifacts, updated thresholds, and full transparency views.")
+
+    with _section_container("Project context", compact_mode):
+        render_section_card(
+            "Project context",
+            "This demo is supported by public and research funding partners. Use these links when you want to acknowledge the project context behind the work.",
+            kicker="Acknowledgement",
+        )
+        render_funding_acknowledgement()
+        render_footerline()
 
     if st.session_state.get("home_message"):
         st.success(st.session_state.home_message)

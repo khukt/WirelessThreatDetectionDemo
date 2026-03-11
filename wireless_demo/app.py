@@ -311,8 +311,11 @@ def main():
         st.session_state.training_info = artifacts.get("training_info", {})
         st.session_state.artifact_trained_at = artifacts.get("trained_at")
         st.session_state.model_artifact_source = artifacts.get("artifact_source", "Memory cache")
+        artifact_source = st.session_state.model_artifact_source
         trained_at = artifacts.get("trained_at")
         trained_note = f" (saved at {trained_at})" if trained_at else ""
+        if artifact_source == "Bundled startup cache":
+            st.caption("📦 Startup cache loaded from the bundled model artifact.")
         st.info(f"Loaded cached model{trained_note} — no setup refresh needed. Use **Run model setup / refresh** to rebuild the models if required.")
         st.session_state.training_prompt_dismissed = False
 
