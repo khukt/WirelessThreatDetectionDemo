@@ -100,25 +100,36 @@ def render_incidents_tab(role):
         kicker="Filtering",
     )
     with st.container(border=True):
-        control_cols = st.columns([1.2, 1, 1, 1])
-        max_items = control_cols[0].slider("Incidents per view", 5, 100, min(25, len(all_incidents)), 5)
+        st.markdown("<div class='quick-chip-row'><span class='quick-chip'>Tip: start with highest severity</span><span class='quick-chip'>Review status stays visible on each card</span><span class='quick-chip'>Search accepts device, scenario, or threat family</span></div>", unsafe_allow_html=True)
+        control_cols = st.columns([1.2, 1, 1, 1, 0.8])
+        max_items = control_cols[0].slider("Incidents per view", 5, 100, min(25, len(all_incidents)), 5, key="incidents_max_items")
         sort_by = control_cols[1].selectbox(
             "Sort by",
             ["Newest first", "Highest probability", "Highest severity", "Device name"],
             index=0,
+            key="incidents_sort_by",
         )
         review_states = control_cols[2].multiselect(
             "Review status",
             ["Pending Review", "Approved", "False Positive", "Escalated"],
             default=["Pending Review", "Approved", "False Positive", "Escalated"],
+            key="incidents_review_states",
         )
-        search_query = control_cols[3].text_input("Search incidents", placeholder="Device, scenario, attack type").strip().lower()
+        search_query = control_cols[3].text_input("Search incidents", placeholder="Device, scenario, attack type", key="incidents_search_query").strip().lower()
+        if control_cols[4].button("Reset", key="incidents_reset_filters", use_container_width=True):
+            st.session_state.incidents_sort_by = "Newest first"
+            st.session_state.incidents_review_states = ["Pending Review", "Approved", "False Positive", "Escalated"]
+            st.session_state.incidents_search_query = ""
+            st.session_state.incidents_severity_filter = ["High", "Medium", "Low"]
+            st.session_state.incidents_max_items = min(25, len(all_incidents))
+            st.rerun()
 
         severity_filter = st.multiselect(
             "Severity filter",
             ["High", "Medium", "Low"],
             default=["High", "Medium", "Low"],
             help="Use this to narrow the triage queue before switching between category tabs.",
+            key="incidents_severity_filter",
         )
 
     filtered_all = _sort_incidents(_filter_incidents(all_incidents, search_query, severity_filter, review_states), sort_by)
@@ -135,6 +146,15 @@ def render_incidents_tab(role):
         summary[1].metric("Pending review", review_counts["Pending Review"])
         summary[2].metric("Approved", review_counts["Approved"])
         summary[3].metric("False positives", review_counts["False Positive"])
+
+    st.markdown(
+        "<div class='quick-chip-row'>"
+        f"<span class='quick-chip'>Filtered: {len(filtered_all)}</span>"
+        f"<span class='quick-chip'>Escalated: {review_counts['Escalated']}</span>"
+        f"<span class='quick-chip'>Sort: {sort_by}</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     if search_query or len(severity_filter) < 3 or len(review_states) < 3 or sort_by != "Newest first":
         st.caption(

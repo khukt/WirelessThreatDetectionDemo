@@ -263,7 +263,11 @@ def style_plotly_figure(fig, title: Optional[str] = None, height: Optional[int] 
 
 @st.cache_data(show_spinner=False, ttl=86400)
 def fetch_logo_bytes(url: str) -> Optional[bytes]:
-    response = requests.get(url, timeout=15)
+    response = requests.get(
+        url,
+        timeout=5,
+        headers={"User-Agent": "TRUST-AI-Demo/1.0"},
+    )
     response.raise_for_status()
     return response.content
 
@@ -585,6 +589,60 @@ def inject_global_styles():
             font-size: 0.9rem;
             color: rgba(49, 51, 63, 0.78);
             margin-bottom: 0.25rem;
+        }
+        .tab-intro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.65rem;
+        }
+        .tab-intro-card {
+            border: 1px solid rgba(49, 51, 63, 0.08);
+            border-radius: 14px;
+            padding: 0.72rem 0.8rem;
+            background: rgba(248,250,252,0.92);
+        }
+        .tab-intro-card-kicker {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(71, 85, 105, 0.75);
+            font-weight: 700;
+            margin-bottom: 0.18rem;
+        }
+        .tab-intro-card-copy {
+            font-size: 0.84rem;
+            line-height: 1.45;
+            color: rgba(49, 51, 63, 0.78);
+        }
+        .tab-role-note {
+            margin-top: 0.55rem;
+            padding: 0.48rem 0.7rem;
+            border-radius: 12px;
+            background: rgba(239,246,255,0.88);
+            border: 1px solid rgba(147, 197, 253, 0.42);
+            color: rgba(30, 64, 175, 0.88);
+            font-size: 0.82rem;
+        }
+        .quick-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin: 0.15rem 0 0.55rem;
+        }
+        .quick-chip {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: rgba(30, 41, 59, 0.88);
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+        @media (max-width: 900px) {
+            .tab-intro-grid {
+                grid-template-columns: 1fr;
+            }
         }
         .pillar-card {
             border: 1px solid rgba(49, 51, 63, 0.10);
@@ -988,15 +1046,27 @@ def render_tab_intro(tab_name: str, role: Optional[str] = None):
         f"""
         <div class="tab-intro">
             <div class="tab-intro-title">{tab_name}</div>
-            <div class="tab-intro-copy"><strong>Purpose:</strong> {copy['summary']}</div>
-            <div class="tab-intro-copy"><strong>What to look for:</strong> {copy['focus']}</div>
-            <div class="tab-intro-copy"><strong>Recommended next step:</strong> {copy['next']}</div>
+            <div class="tab-intro-copy">Use this section as a guided workspace rather than a raw dashboard.</div>
+            <div class="tab-intro-grid">
+                <div class="tab-intro-card">
+                    <div class="tab-intro-card-kicker">Purpose</div>
+                    <div class="tab-intro-card-copy">{copy['summary']}</div>
+                </div>
+                <div class="tab-intro-card">
+                    <div class="tab-intro-card-kicker">What to look for</div>
+                    <div class="tab-intro-card-copy">{copy['focus']}</div>
+                </div>
+                <div class="tab-intro-card">
+                    <div class="tab-intro-card-kicker">Recommended next step</div>
+                    <div class="tab-intro-card-copy">{copy['next']}</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
     if role_copy:
-        st.caption(f"For {role}: {role_copy}")
+        st.markdown(f"<div class='tab-role-note'><strong>For {role}:</strong> {role_copy}</div>", unsafe_allow_html=True)
 
 
 def render_role_flow_hint(role: str):

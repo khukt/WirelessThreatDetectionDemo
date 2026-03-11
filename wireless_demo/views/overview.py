@@ -22,6 +22,18 @@ ROLE_OVERVIEW_CALLOUT = {
 }
 
 
+@st.cache_data(show_spinner=False)
+def _cached_circle_path(center_lat, center_lon, radius_m, lat_mean, n_points=60):
+    angles = np.linspace(0, 2 * np.pi, n_points)
+    path = []
+    for angle in angles:
+        north = radius_m * math.sin(angle)
+        east = radius_m * math.cos(angle)
+        dlat, dlon = meters_to_latlon_offset(north, east, lat_mean)
+        path.append([center_lon + dlon, center_lat + dlat])
+    return path
+
+
 def _spotlight_device_rows(df):
     rows = []
     for _, row in df.iterrows():
@@ -64,7 +76,7 @@ def _scenario_spotlight(df_map, scenario):
     else:
         return None
 
-    distances = df_map.apply(lambda row: haversine_m(row.lat, row.lon, center["lat"], center["lon"]), axis=1)
+    distances = np.array([haversine_m(row.lat, row.lon, center["lat"], center["lon"]) for row in df_map.itertuples(index=False)])
     zone_df = df_map.loc[distances <= radius_m].copy()
     in_zone = int(len(zone_df))
     hot_in_zone = int((zone_df["risk"] >= CFG.threshold).sum())
@@ -121,17 +133,12 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
         if not show_map:
             st.info("Enable **Show geospatial map** from the sidebar to visualize devices and attack radius overlays.")
         elif st.session_state.get("model") is not None:
-            snrs, losses = [], []
-            for _, row in df_map.iterrows():
-                buf = st.session_state.dev_buf.get(row.device_id, [])
-                if buf and len(buf) > 0:
-                    snrs.append(float(buf[-1].get("snr", np.nan)))
-                    losses.append(float(buf[-1].get("packet_loss", np.nan)))
-                else:
-                    snrs.append(np.nan)
-                    losses.append(np.nan)
-            df_map["snr"] = snrs
-            df_map["packet_loss"] = losses
+            latest_device_metrics = {
+                device_id: (buf[-1] if buf and len(buf) > 0 else {})
+                for device_id, buf in st.session_state.dev_buf.items()
+            }
+            df_map["snr"] = df_map["device_id"].map(lambda device_id: float(latest_device_metrics.get(device_id, {}).get("snr", np.nan)))
+            df_map["packet_loss"] = df_map["device_id"].map(lambda device_id: float(latest_device_metrics.get(device_id, {}).get("packet_loss", np.nan)))
 
             type_colors = {
                 "AMR": [0, 128, 255, 220],
@@ -211,15 +218,8 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
                 ]
 
             def circle_layer(center, radius_m, color):
-                angles = np.linspace(0, 2 * np.pi, 60)
                 lat_mean = float(st.session_state.devices.lat.mean())
-                path = [
-                    [
-                        center["lon"] + meters_to_latlon_offset(radius_m * math.sin(angle), radius_m * math.cos(angle), lat_mean)[1],
-                        center["lat"] + meters_to_latlon_offset(radius_m * math.sin(angle), radius_m * math.cos(angle), lat_mean)[0],
-                    ]
-                    for angle in angles
-                ]
+                path = _cached_circle_path(center["lat"], center["lon"], radius_m, lat_mean)
                 return pdk.Layer("PathLayer", [{"path": path}], get_path="path", get_color=color, width_scale=4, width_min_pixels=1, opacity=0.25)
 
             if scenario.startswith("Jamming"):
@@ -306,11 +306,12 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role):
             kicker="Trend view",
         )
         if len(fleet_records) > 0:
+            trend_cols = ["snr", "packet_loss", "latency_ms", "pos_error_m"]
+            fleet_trends = fleet_records.groupby("tick")[trend_cols].mean().reset_index()
             chart_cols = st.columns(2)
             for idx, y_axis in enumerate(["snr", "packet_loss", "latency_ms", "pos_error_m"]):
-                sub = fleet_records.groupby("tick")[y_axis].mean().reset_index()
                 title = f"Fleet average {y_axis.replace('_', ' ')}"
-                fig = px.line(sub, x="tick", y=y_axis, title=title)
+                fig = px.line(fleet_trends, x="tick", y=y_axis, title=title)
                 with chart_cols[idx % 2]:
                     with st.container(border=True):
                         st.plotly_chart(

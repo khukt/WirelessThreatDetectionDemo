@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from ..ux import render_tab_intro
+from ..ux import render_section_card, render_tab_intro
 
 
 ROLE_FLEET_CALLOUT = {
@@ -17,11 +17,25 @@ ROLE_FLEET_CALLOUT = {
 def render_fleet_tab(show_heatmap, role):
     render_tab_intro("Fleet View", role)
     st.info(f"{role} focus: {ROLE_FLEET_CALLOUT.get(role, ROLE_FLEET_CALLOUT['End User'])}")
+    render_section_card(
+        "Fleet workspace",
+        "Use this tab to compare device behavior, scan for broad drift patterns, and check whether the current scenario is isolated or fleet-wide.",
+        kicker="Comparison view",
+    )
     fleet_records = pd.DataFrame(list(st.session_state.fleet_records))
+    latest_probs = st.session_state.get("latest_probs", {})
+    top_device, top_prob = (max(latest_probs.items(), key=lambda item: item[1]) if latest_probs else ("—", 0.0))
     summary_cols = st.columns(3)
     summary_cols[0].metric("Devices in fleet", len(st.session_state.devices))
     summary_cols[1].metric("Latest tick", st.session_state.get("tick", 0))
-    summary_cols[2].metric("Records buffered", len(fleet_records))
+    summary_cols[2].metric("Top device risk", f"{top_device} · {top_prob:.2f}" if latest_probs else "Waiting for telemetry")
+
+    with st.container(border=True):
+        control_cols = st.columns([1.3, 1, 1.1])
+        device_query = control_cols[0].text_input("Search devices", placeholder="Device ID", key="fleet_device_query").strip().lower()
+        available_types = sorted(st.session_state.devices["type"].unique().tolist())
+        selected_types = control_cols[1].multiselect("Device types", available_types, default=available_types, key="fleet_type_filter")
+        control_cols[2].caption("Use the heatmap for fleet-wide drift, then narrow the inventory to inspect the affected devices.")
 
     if len(fleet_records) > 0 and show_heatmap:
         recent = fleet_records[fleet_records["tick"] >= st.session_state.tick - 40]
@@ -64,5 +78,20 @@ def render_fleet_tab(show_heatmap, role):
     else:
         st.info("Start playback to populate fleet telemetry before comparing device behavior.")
 
-    st.markdown("### Fleet inventory")
-    st.dataframe(st.session_state.devices, width="stretch")
+    render_section_card(
+        "Fleet inventory",
+        "Filter the current device list to inspect which asset types are in scope and which devices deserve deeper review next.",
+        kicker="Inventory",
+    )
+    devices_df = st.session_state.devices.copy()
+    if selected_types:
+        devices_df = devices_df[devices_df["type"].isin(selected_types)]
+    if device_query:
+        devices_df = devices_df[devices_df["device_id"].str.lower().str.contains(device_query)]
+    devices_df["live_risk"] = devices_df["device_id"].map(latest_probs).fillna(0.0)
+    st.caption(f"Showing {len(devices_df)} of {len(st.session_state.devices)} devices.")
+    st.dataframe(
+        devices_df.sort_values(["live_risk", "device_id"], ascending=[False, True]),
+        width="stretch",
+        hide_index=True,
+    )

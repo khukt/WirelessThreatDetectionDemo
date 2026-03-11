@@ -103,6 +103,7 @@ def init_state():
         "conformal_scores": None,
         "metrics": {},
         "baseline": None,
+        "global_importance": None,
         "eval": {},
         "training_info": {},
         "type_clf": None,

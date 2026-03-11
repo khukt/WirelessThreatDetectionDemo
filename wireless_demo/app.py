@@ -127,6 +127,7 @@ def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role
         "Insights": lambda: render_insights_tab(role),
         "Governance": lambda: render_governance_tab(role),
     }
+    live_tabs = {"Overview", "Fleet View", "Incidents"}
 
     if st.session_state.get("model") is None:
         st.warning("Model setup has not been run yet. Start with the Home tab or use **Run model setup / refresh** in the sidebar.")
@@ -135,14 +136,30 @@ def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role
 
     selected_tab = _render_primary_navigation(tab_order)
 
+    if st.session_state.get("model") is not None and not auto:
+        if st.button("Step once"):
+            tick_once(scenario, use_conformal)
+            st.rerun()
+
+    if st.session_state.get("model") is None or not auto:
+        tab_renderers[selected_tab]()
+        return
+
+    if selected_tab not in live_tabs:
+        tab_renderers[selected_tab]()
+
+        @st.fragment(run_every=refresh_interval)
+        def run_background_tick_fragment():
+            for _ in range(speed):
+                tick_once(scenario, use_conformal)
+
+        run_background_tick_fragment()
+        return
+
     @st.fragment(run_every=refresh_interval)
     def render_live_workflow_fragment():
-        if st.session_state.get("model") is not None:
-            if auto:
-                for _ in range(speed):
-                    tick_once(scenario, use_conformal)
-            elif st.button("Step once"):
-                tick_once(scenario, use_conformal)
+        for _ in range(speed):
+            tick_once(scenario, use_conformal)
         tab_renderers[selected_tab]()
 
     render_live_workflow_fragment()
@@ -300,6 +317,7 @@ def main():
         st.session_state.conformal_scores = artifacts["conformal_scores"]
         st.session_state.metrics = artifacts["metrics"]
         st.session_state.baseline = artifacts["baseline"]
+        st.session_state.global_importance = artifacts.get("global_importance")
         st.session_state.eval = artifacts["eval"]
         st.session_state.suggested_threshold = artifacts.get("suggested_threshold")
         st.session_state.type_clf = artifacts.get("type_clf")

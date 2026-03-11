@@ -51,6 +51,7 @@ def _render_role_summary(role):
     st.markdown("\n".join([f"- {bullet}" for bullet in summary["bullets"]]))
 
 
+@st.cache_data(show_spinner=False)
 def _stakeholder_architecture_figure():
     def wrap_text(text, width):
         return fill(text, width=width).replace("\n", "<br>")
@@ -254,6 +255,7 @@ def _stakeholder_architecture_figure():
     return fig
 
 
+@st.cache_data(show_spinner=False)
 def _model_decision_pipeline_figure():
     def add_box(x0, y0, x1, y1, title, subtitle, fill_color, accent_color, step, icon, centered=False, wrap_width=34):
         fig.add_shape(
@@ -533,6 +535,28 @@ def _fmt_metric_value(value, precision=2, empty="—"):
     return f"{numeric:.{precision}f}"
 
 
+def _get_global_importance_df():
+    importance = st.session_state.get("global_importance")
+    if importance is not None and len(importance) > 0:
+        return importance
+
+    baseline = st.session_state.get("baseline")
+    explainer = st.session_state.get("explainer")
+    if baseline is None or len(baseline) == 0 or explainer is None:
+        return None
+
+    sample = baseline.sample(n=min(len(baseline), 600), random_state=42) if len(baseline) > 600 else baseline
+    shap_mat = shap_pos(explainer, sample)
+    mean_abs = np.abs(shap_mat).mean(axis=0)
+    importance = (
+        pd.DataFrame({"feature": sample.columns, "mean_abs_shap": mean_abs})
+        .sort_values("mean_abs_shap", ascending=False)
+        .reset_index(drop=True)
+    )
+    st.session_state.global_importance = importance
+    return importance
+
+
 def _render_transparency_side_panel(metrics, training_info, threshold, type_metrics):
     detector_label = "LightGBM binary"
     type_label = "LightGBM + rules"
@@ -630,17 +654,11 @@ def _render_model_transparency_card(nonce, role):
 
         with tabs[1]:
             st.caption("Top feature drivers")
-            baseline = st.session_state.get("baseline")
-            if baseline is not None and len(baseline) > 0:
-                shap_mat = shap_pos(st.session_state.explainer, baseline)
-                mean_abs = np.abs(shap_mat).mean(axis=0)
-                importance = (
-                    pd.DataFrame({"feature": baseline.columns, "mean_abs_shap": mean_abs})
-                    .sort_values("mean_abs_shap", ascending=False)
-                    .head(10)
-                )
+            importance = _get_global_importance_df()
+            if importance is not None and len(importance) > 0:
+                top_importance = importance.head(10)
                 fig = px.bar(
-                    importance.sort_values("mean_abs_shap"),
+                    top_importance.sort_values("mean_abs_shap"),
                     x="mean_abs_shap",
                     y="feature",
                     orientation="h",
@@ -737,16 +755,10 @@ def render_insights_tab(role):
             with st.container(border=True):
                 st.markdown("#### Global importance")
                 st.caption("Mean absolute SHAP values show which features influence anomaly decisions most across the dataset.")
-                baseline = st.session_state.get("baseline")
-                if baseline is not None and len(baseline) > 0:
-                    shap_mat = shap_pos(st.session_state.explainer, baseline)
-                    mean_abs = np.abs(shap_mat).mean(axis=0)
-                    importance = (
-                        pd.DataFrame({"feature": baseline.columns, "mean_abs_shap": mean_abs})
-                        .sort_values("mean_abs_shap", ascending=False)
-                        .head(18)
-                    )
-                    fig = px.bar(importance, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact")
+                importance = _get_global_importance_df()
+                if importance is not None and len(importance) > 0:
+                    top_importance = importance.head(18)
+                    fig = px.bar(top_importance, x="mean_abs_shap", y="feature", orientation="h", title="Global feature impact")
                     st.plotly_chart(
                         style_plotly_figure(fig, height=420),
                         use_container_width=True,

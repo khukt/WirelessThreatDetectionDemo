@@ -6,6 +6,16 @@ from ..training import render_training_explainer
 from ..ux import render_footerline, render_funding_acknowledgement, render_section_card, render_tab_intro
 
 
+@st.cache_data(show_spinner=False)
+def _prepare_review_audit_artifacts(review_records_json: str):
+    review_df = pd.read_json(review_records_json)
+    if "reviewed_at" in review_df.columns:
+        review_df["reviewed_at"] = pd.to_datetime(review_df["reviewed_at"], unit="s").dt.strftime("%Y-%m-%d %H:%M:%S")
+    display_cols = [col for col in ["reviewed_at", "reviewer_role", "status", "device_id", "scenario", "severity", "type_label", "note"] if col in review_df.columns]
+    export_json = review_df.to_json(orient="records", indent=2)
+    return review_df, display_cols, export_json
+
+
 ROLE_GOVERNANCE_CALLOUT = {
     "End User": "This page explains the controls behind the demo, but it is secondary to day-to-day triage.",
     "Domain Expert": "Use governance to confirm that oversight, logging, and review controls support your operational decisions.",
@@ -241,14 +251,12 @@ def render_governance_tab(role):
     if reviews:
         with st.container(border=True):
             st.caption("Recent human review log")
-            review_df = pd.DataFrame(reviews)
-            if "reviewed_at" in review_df.columns:
-                review_df["reviewed_at"] = pd.to_datetime(review_df["reviewed_at"], unit="s").dt.strftime("%Y-%m-%d %H:%M:%S")
-            display_cols = [col for col in ["reviewed_at", "reviewer_role", "status", "device_id", "scenario", "severity", "type_label", "note"] if col in review_df.columns]
+            reviews_json = pd.DataFrame(reviews).to_json(orient="records")
+            review_df, display_cols, export_json = _prepare_review_audit_artifacts(reviews_json)
             st.dataframe(review_df[display_cols], width="stretch", hide_index=True)
             st.download_button(
                 "Download review audit log",
-                data=review_df.to_json(orient="records", indent=2),
+                data=export_json,
                 file_name="hitl_review_log.json",
                 mime="application/json",
                 use_container_width=True,

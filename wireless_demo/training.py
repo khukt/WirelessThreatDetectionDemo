@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from .config import CFG, DEVICE_TYPES, MOBILE_TYPES, MODEL_KEY, SEED, TYPE_ALPHA, TYPE_DELTA, TYPE_TAU
-from .helpers import fmt_eta, meters_to_latlon_offset, rand_point_near, to_df
+from .helpers import fmt_eta, meters_to_latlon_offset, rand_point_near, shap_pos, to_df
 from .logic import (
     _select_type_bases,
     build_window_features,
@@ -405,6 +405,14 @@ def train_model_with_progress(n_ticks=350):
     st.session_state.conformal_scores = cal_nonconformity
     st.session_state.metrics = {"precision": precision, "recall": recall, "f1": f1, "auc": auc, "brier": brier}
     st.session_state.baseline = Xall_df
+    baseline_sample = Xall_df.sample(n=min(len(Xall_df), 600), random_state=SEED) if len(Xall_df) > 600 else Xall_df
+    shap_mat = shap_pos(st.session_state.explainer, baseline_sample)
+    mean_abs = np.abs(shap_mat).mean(axis=0)
+    st.session_state.global_importance = (
+        pd.DataFrame({"feature": baseline_sample.columns, "mean_abs_shap": mean_abs})
+        .sort_values("mean_abs_shap", ascending=False)
+        .reset_index(drop=True)
+    )
     st.session_state.eval = {"y_test": y_test, "te_p": test_probs, "brier": brier}
     total_secs = time.time() - t_start
     st.session_state.last_train_secs = total_secs
@@ -419,6 +427,7 @@ def train_model_with_progress(n_ticks=350):
         "conformal_scores": cal_nonconformity,
         "metrics": st.session_state.metrics,
         "baseline": Xall_df,
+        "global_importance": st.session_state.global_importance,
         "eval": st.session_state.eval,
         "suggested_threshold": st.session_state.suggested_threshold,
         "type_clf": st.session_state.type_clf,
