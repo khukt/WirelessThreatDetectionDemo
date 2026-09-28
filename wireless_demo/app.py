@@ -6,6 +6,7 @@ import streamlit as st
 from .config import CFG, DEVICE_TYPES, MODEL_KEY
 from .logic import tick_once
 from .persistence import load_model_artifacts
+from .simple_views import render_simple_home, render_simple_incidents, render_simple_overview
 from .state import init_state, model_store, reset_live_simulation
 from .training import train_model_with_progress
 from .ux import (
@@ -16,11 +17,7 @@ from .ux import (
     render_disclaimer_banner,
     render_onboarding_destination_card,
     render_onboarding_panel,
-    render_sidebar_hint,
-    render_sidebar_intro_card,
     render_status_strip,
-    render_sidebar_summary_card,
-    sidebar_role_copy,
 )
 from .views.fleet import render_fleet_tab
 from .views.governance import render_governance_tab
@@ -51,9 +48,21 @@ ONBOARDING_STEP_TITLES = {
 }
 PRESENTATION_REFRESH_MS = 1800
 PRESENTATION_SPEED = 1
+SIMPLE_TAB_LABELS = {"Home": "Start", "Overview": "Live activity", "Incidents": "Alerts"}
+SIMPLE_SCENARIO_LABELS = {
+    "Normal": "Normal activity",
+    "Jamming (localized)": "Wireless interference",
+    "Access Breach (AP/gNB)": "Unauthorized access",
+    "GPS Spoofing (subset)": "False location signals",
+    "Data Tamper (gateway)": "Changed device data",
+}
 
 
 def _apply_pending_home_actions():
+    pending_tab = st.session_state.pop("pending_primary_tab", None)
+    if pending_tab is not None:
+        st.session_state.active_primary_tab = pending_tab
+
     pending_scenario = st.session_state.pop("pending_home_scenario", None)
     if pending_scenario is not None:
         st.session_state.scenario_selector = pending_scenario
@@ -61,6 +70,10 @@ def _apply_pending_home_actions():
     pending_role = st.session_state.pop("pending_home_role", None)
     if pending_role is not None:
         st.session_state.role_selector_preview = pending_role
+
+    pending_auto = st.session_state.pop("pending_auto_stream", None)
+    if pending_auto is not None:
+        st.session_state.auto_stream = pending_auto
 
 
 def _apply_onboarding_choices():
@@ -363,7 +376,7 @@ def _render_initial_training_prompt():
     _render_initial_training_prompt_dialog()
 
 
-def _render_primary_navigation(tab_order):
+def _render_primary_navigation(tab_order, simple_mode=False):
     current_tab = st.session_state.get("active_primary_tab")
     if current_tab not in tab_order:
         current_tab = tab_order[0]
@@ -373,7 +386,7 @@ def _render_primary_navigation(tab_order):
         "Primary navigation",
         options=tab_order,
         index=tab_order.index(current_tab),
-        format_func=lambda tab_name: TAB_DISPLAY_LABELS.get(tab_name, tab_name),
+        format_func=lambda tab_name: (SIMPLE_TAB_LABELS if simple_mode else TAB_DISPLAY_LABELS).get(tab_name, tab_name),
         horizontal=True,
         label_visibility="collapsed",
         key="active_primary_tab",
@@ -397,28 +410,39 @@ def _reset_simulation_if_context_changed(scenario, cellular_mode):
         st.session_state.context_change_message = f"Simulation reset for {scenario} in {'Road' if cellular_mode else 'Yard'} mode."
 
 
-def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role, help_mode, show_eu_status, show_map, type_filter, show_heatmap, profile):
+def _render_live_workflow(refresh_ms, auto, speed, scenario, use_conformal, role, help_mode, show_eu_status, show_map, type_filter, show_heatmap, profile, simple_mode):
     refresh_interval = refresh_ms / 1000 if auto and st.session_state.get("model") is not None else None
-    tab_order = ROLE_TAB_ORDER.get(role, ROLE_TAB_ORDER["End User"])
-    tab_renderers = {
-        "Home": lambda refresh_interval=None: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
-        "Overview": lambda refresh_interval=None: render_overview_tab(scenario, show_map, type_filter, use_conformal, role, refresh_interval=refresh_interval),
-        "Fleet View": lambda refresh_interval=None: render_fleet_tab(show_heatmap, role, refresh_interval=refresh_interval),
-        "Incidents": lambda refresh_interval=None: render_incidents_tab(role, refresh_interval=refresh_interval),
-        "Insights": lambda refresh_interval=None: render_insights_tab(role),
-        "Governance": lambda refresh_interval=None: render_governance_tab(role),
-    }
-    live_tabs = {"Overview", "Fleet View", "Incidents"}
+    if simple_mode:
+        tab_order = ["Home", "Overview", "Incidents"]
+        tab_renderers = {
+            "Home": lambda refresh_interval=None: render_simple_home(scenario, profile, refresh_interval=refresh_interval),
+            "Overview": lambda refresh_interval=None: render_simple_overview(scenario, refresh_interval=refresh_interval),
+            "Incidents": lambda refresh_interval=None: render_simple_incidents(refresh_interval=refresh_interval),
+        }
+    else:
+        tab_order = ROLE_TAB_ORDER.get(role, ROLE_TAB_ORDER["End User"])
+        tab_renderers = {
+            "Home": lambda refresh_interval=None: render_home_tab(role, scenario, profile, help_mode, show_eu_status),
+            "Overview": lambda refresh_interval=None: render_overview_tab(scenario, show_map, type_filter, use_conformal, role, refresh_interval=refresh_interval),
+            "Fleet View": lambda refresh_interval=None: render_fleet_tab(show_heatmap, role, refresh_interval=refresh_interval),
+            "Incidents": lambda refresh_interval=None: render_incidents_tab(role, refresh_interval=refresh_interval),
+            "Insights": lambda refresh_interval=None: render_insights_tab(role),
+            "Governance": lambda refresh_interval=None: render_governance_tab(role),
+        }
+    live_tabs = {"Home", "Overview", "Incidents"} if simple_mode else {"Overview", "Fleet View", "Incidents"}
 
     if st.session_state.get("model") is None:
-        st.warning("Model setup has not been run yet. Start with the Home tab or use **Run model setup / refresh** in the sidebar.")
-    else:
+        if simple_mode:
+            st.warning("The demo model is not ready yet. Use Set up demo model on Start to continue.")
+        else:
+            st.warning("Model setup has not been run yet. Start with the Home tab or use **Run model setup / refresh** in the sidebar.")
+    elif not simple_mode:
         st.caption("Use the Home tab for onboarding, or jump directly into the live workflow tabs below.")
 
-    selected_tab = _render_primary_navigation(tab_order)
+    selected_tab = _render_primary_navigation(tab_order, simple_mode=simple_mode)
 
     if st.session_state.get("model") is not None and not auto:
-        if st.button("Step once"):
+        if st.button("Advance one step"):
             tick_once(scenario, use_conformal)
             st.rerun()
 
@@ -458,7 +482,7 @@ def main():
     st.set_page_config(page_title="TRUST AI — Wireless Threats (Sundsvall)", layout="wide")
     inject_global_styles()
 
-    onboarding_active = not st.session_state.get("welcome_prompt_dismissed", False)
+    onboarding_active = not st.session_state.get("welcome_prompt_dismissed", True)
     if onboarding_active:
         st.markdown(
             """
@@ -487,146 +511,113 @@ def main():
             disk_artifacts["artifact_source"] = disk_artifacts.get("artifact_source", "Disk cache")
             store[MODEL_KEY] = disk_artifacts
 
-    render_disclaimer_banner()
-
     with st.sidebar:
-        sidebar_copy = sidebar_role_copy(st.session_state.get("role_selector_preview", "AI Builder"))
-        profile = st.session_state.get("cellular_mode")
-        current_profile_label = "Road" if profile else "Yard"
-        render_sidebar_intro_card("Demo controls", "Configure the scenario, playback, model behavior, and audience view from one place.")
-        render_sidebar_summary_card(current_profile_label, st.session_state.get("scenario_selector", "Normal"), st.session_state.get("role_selector_preview", "AI Builder"))
-        render_sidebar_hint("Current guidance", sidebar_copy["controls"], variant="info")
-        with st.expander("Scenario setup", expanded=True):
+        st.header("Wireless threat demo")
+        simple_mode = st.toggle(
+            "Simple view",
+            value=True,
+            key="simple_mode",
+            help="Show a short path for visitors. Turn this off for model, fleet, and governance tools.",
+        )
+        scenario = st.selectbox(
+            "Scenario",
+            ONBOARDING_SCENARIOS,
+            key="scenario_selector",
+            format_func=(lambda name: SIMPLE_SCENARIO_LABELS[name]) if simple_mode else str,
+        )
+        if simple_mode:
+            st.caption("Choose a situation, then watch the simulated devices respond.")
+        auto = st.toggle("Run simulation", value=True, key="auto_stream")
+        reset = st.button("Reset simulation", use_container_width=True)
+
+        cached_artifacts = store.get(MODEL_KEY, {})
+        calibration_available = (
+            st.session_state.get("conformal_scores") is not None
+            or cached_artifacts.get("conformal_scores") is not None
+        )
+
+        if simple_mode:
+            profile = "Yard (Wi-Fi/private-5G dominant)"
+            st.session_state.cellular_mode = False
+            speed, refresh_ms, presentation_mode = 3, 1200, False
+            effective_refresh_ms, effective_speed = refresh_ms, speed
+            use_conformal = calibration_available
+            role = "End User"
+            show_map, show_heatmap, type_filter = True, False, DEVICE_TYPES
+            help_mode, show_eu_status, retrain = False, False, False
+            with st.expander("Help and details"):
+                st.write("This is a simulation. Alerts are suggestions for a person to review, not confirmed attacks.")
+        else:
+            st.caption("Advanced view · technical controls and full analysis")
             profile = st.selectbox(
                 "Comms profile",
                 ["Yard (Wi-Fi/private-5G dominant)", "Road (Cellular 5G/LTE dominant)"],
-                index=1,
+                index=1 if st.session_state.get("cellular_mode", False) else 0,
             )
             st.session_state["cellular_mode"] = profile.startswith("Road")
-
-            scenario = st.selectbox(
-                "Scenario",
-                ["Normal", "Jamming (localized)", "Access Breach (AP/gNB)", "GPS Spoofing (subset)", "Data Tamper (gateway)"],
-                index=0,
-                key="scenario_selector",
-            )
-            render_sidebar_hint("Scenario focus", sidebar_copy["scenario"])
-
-            if scenario.startswith("Jamming"):
-                st.radio("Jamming type", ["Broadband noise", "Reactive", "Burst interference"], index=0, key="jam_mode")
-                CFG.jam_radius_m = st.slider("Jam coverage (m)", 50, 500, CFG.jam_radius_m, 10, key="jam_radius")
-
-            if scenario.startswith("Access Breach"):
-                st.radio("Breach mode", ["Evil Twin", "Rogue Open AP", "Credential hammer", "Deauth flood"], index=0, key="breach_mode")
-                CFG.breach_radius_m = st.slider("Rogue node lure radius (m)", 50, 300, CFG.breach_radius_m, 10, key="breach_radius")
-
-            if scenario.startswith("GPS Spoofing"):
-                st.radio("Spoofing scope", ["Single device", "Localized area", "Site-wide"], index=1, key="spoof_mode")
-                st.checkbox("Affect mobile (AMR/Truck) only", True, key="spoof_mobile_only")
-                CFG.spoof_radius_m = st.slider("Spoof coverage (m)", 50, 500, CFG.spoof_radius_m, 10, key="spoof_radius")
-
-            if scenario.startswith("Data Tamper"):
-                st.radio(
-                    "Tamper mode",
-                    ["Replay", "Constant injection", "Bias/Drift", "Bitflip/Noise", "Scale/Unit mismatch"],
-                    index=0,
-                    key="tamper_mode",
-                )
-
-        with st.expander("Playback", expanded=False):
-            speed = st.slider("Playback speed (ticks/refresh)", 1, 10, 3)
-            auto = st.checkbox("Auto stream", True)
-            refresh_ms = st.slider("Auto refresh cadence (ms)", 300, 3000, 1200, 100, disabled=not auto)
-            presentation_mode = st.checkbox("Presentation mode", value=st.session_state.get("presentation_mode", False), key="presentation_mode")
-            effective_refresh_ms, effective_speed = _effective_playback_settings(refresh_ms, speed, presentation_mode)
-            reset = st.button("Reset session", use_container_width=True)
-            render_sidebar_hint("Playback tip", "Use slower cadence for presentations and faster cadence when you want incidents to populate quickly.")
-            if presentation_mode:
-                st.caption(
-                    f"Presentation pacing active · using {effective_speed} tick per refresh and at least {effective_refresh_ms} ms between UI updates."
-                )
-
-        with st.expander("Model behavior", expanded=False):
-            cached_artifacts = store.get(MODEL_KEY, {})
-            calibration_available = (
-                st.session_state.get("conformal_scores") is not None
-                or cached_artifacts.get("conformal_scores") is not None
-            )
-            use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True, disabled=not calibration_available)
-            if not calibration_available:
-                st.caption("Calibration is unavailable for this cached model. Run model setup / refresh to enable p-values.")
-            threshold_value = st.slider("Incident threshold (model prob.)", 0.30, 0.95, CFG.threshold, 0.01, key="th_slider")
-            CFG.threshold = threshold_value
-            if st.session_state.get("suggested_threshold") is not None:
-                if st.button(f"Apply suggested threshold ({st.session_state.suggested_threshold:.2f})", use_container_width=True):
-                    st.session_state.th_slider = float(st.session_state.suggested_threshold)
-            render_sidebar_hint("Model behavior", "Alerts fire when probability ≥ threshold; p-value refines severity if enabled.")
-            render_sidebar_hint("Role guidance", sidebar_copy["model"])
-            retrain = st.button("Run model setup / refresh", use_container_width=True)
-
-        with st.expander("HITL policy", expanded=False):
-            st.checkbox(
-                "Suppress repeat false positives",
-                value=st.session_state.get("hitl_suppression_enabled", CFG.hitl_suppression_enabled),
-                key="hitl_suppression_enabled",
-            )
-            st.slider(
-                "False-positive suppression window (ticks)",
-                0,
-                100,
-                int(st.session_state.get("hitl_suppression_ticks", CFG.hitl_suppression_ticks)),
-                1,
-                key="hitl_suppression_ticks",
-            )
-            render_sidebar_hint(
-                "Suppression window",
-                "How long a device stays deprioritized after a reviewer marks a recent alert as a false positive. `0` means no suppression window.",
-            )
-            st.slider(
-                "Escalation queue boost",
-                0.0,
-                1.0,
-                float(st.session_state.get("hitl_escalation_boost", CFG.hitl_escalation_boost)),
-                0.05,
-                key="hitl_escalation_boost",
-            )
-            render_sidebar_hint(
-                "Escalation boost",
-                "Extra priority added to escalated incidents so they rise higher in the queue. Higher values push reviewed high-risk items to the front faster.",
-            )
-            render_sidebar_hint("Policy effect", "These controls change how prior human reviews influence duplicate suppression and triage ordering.")
-
-        with st.expander("Display and audience", expanded=False):
-            show_map = st.checkbox("Show geospatial map", True)
-            show_heatmap = st.checkbox("Show fleet heatmap (metric z-scores)", True)
-            type_filter = st.multiselect("Show device types", DEVICE_TYPES, default=DEVICE_TYPES)
             role = st.selectbox(
                 "Viewer role",
                 ["End User", "Domain Expert", "Regulator", "AI Builder", "Executive"],
-                index=3,
+                index=0,
                 key="role_selector_preview",
             )
-            sidebar_copy = sidebar_role_copy(role)
-            render_sidebar_hint("Display guidance", sidebar_copy["display"])
+            with st.expander("Scenario details", expanded=False):
+                if scenario.startswith("Jamming"):
+                    st.radio("Jamming type", ["Broadband noise", "Reactive", "Burst interference"], index=0, key="jam_mode")
+                    CFG.jam_radius_m = st.slider("Jam coverage (m)", 50, 500, CFG.jam_radius_m, 10, key="jam_radius")
+                if scenario.startswith("Access Breach"):
+                    st.radio("Breach mode", ["Evil Twin", "Rogue Open AP", "Credential hammer", "Deauth flood"], index=0, key="breach_mode")
+                    CFG.breach_radius_m = st.slider("Rogue node lure radius (m)", 50, 300, CFG.breach_radius_m, 10, key="breach_radius")
+                if scenario.startswith("GPS Spoofing"):
+                    st.radio("Spoofing scope", ["Single device", "Localized area", "Site-wide"], index=1, key="spoof_mode")
+                    st.checkbox("Affect mobile (AMR/Truck) only", True, key="spoof_mobile_only")
+                    CFG.spoof_radius_m = st.slider("Spoof coverage (m)", 50, 500, CFG.spoof_radius_m, 10, key="spoof_radius")
+                if scenario.startswith("Data Tamper"):
+                    st.radio("Tamper mode", ["Replay", "Constant injection", "Bias/Drift", "Bitflip/Noise", "Scale/Unit mismatch"], index=0, key="tamper_mode")
 
-        with st.expander("Guidance", expanded=False):
-            help_mode = st.checkbox("Help mode (inline hints)", True)
-            show_eu_status = st.checkbox("Show EU AI Act status banner", True)
-            render_sidebar_hint("When to use this", sidebar_copy["guidance"])
-            if st.button("Restart guided onboarding", use_container_width=True, type="secondary"):
-                _restart_onboarding()
-                st.rerun()
-            if st.button("Open model setup guide", use_container_width=True):
-                st.session_state.open_training_dialog = True
-                st.rerun()
+            with st.expander("Playback details", expanded=False):
+                speed = st.slider("Playback speed (steps per refresh)", 1, 10, 3)
+                refresh_ms = st.slider("Refresh cadence (ms)", 300, 3000, 1200, 100, disabled=not auto)
+                presentation_mode = st.checkbox("Presentation mode", value=st.session_state.get("presentation_mode", False), key="presentation_mode")
+            effective_refresh_ms, effective_speed = _effective_playback_settings(refresh_ms, speed, presentation_mode)
+            with st.expander("Model and alert settings", expanded=False):
+                use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True, disabled=not calibration_available)
+                if not calibration_available:
+                    st.caption("Run model setup / refresh to enable p-values.")
+                CFG.threshold = st.slider("Incident threshold (model probability)", 0.30, 0.95, CFG.threshold, 0.01, key="th_slider")
+                if st.session_state.get("suggested_threshold") is not None:
+                    if st.button(f"Use suggested threshold ({st.session_state.suggested_threshold:.2f})", use_container_width=True):
+                        st.session_state.th_slider = float(st.session_state.suggested_threshold)
+                retrain = st.button("Run model setup / refresh", use_container_width=True)
+            with st.expander("Human review policy", expanded=False):
+                st.checkbox("Suppress repeat false positives", value=st.session_state.get("hitl_suppression_enabled", CFG.hitl_suppression_enabled), key="hitl_suppression_enabled")
+                st.slider("False-positive suppression window (steps)", 0, 100, int(st.session_state.get("hitl_suppression_ticks", CFG.hitl_suppression_ticks)), 1, key="hitl_suppression_ticks")
+                st.slider("Escalation queue boost", 0.0, 1.0, float(st.session_state.get("hitl_escalation_boost", CFG.hitl_escalation_boost)), 0.05, key="hitl_escalation_boost")
+            with st.expander("Display options", expanded=False):
+                show_map = st.checkbox("Show geospatial map", True)
+                show_heatmap = st.checkbox("Show fleet heatmap", True)
+                type_filter = st.multiselect("Show device types", DEVICE_TYPES, default=DEVICE_TYPES)
+                help_mode = st.checkbox("Help mode (inline hints)", True)
+                show_eu_status = st.checkbox("Show EU AI Act status banner", True)
+            with st.expander("Help", expanded=False):
+                if st.button("Open guided tour", use_container_width=True):
+                    _restart_onboarding()
+                    st.rerun()
+                if st.button("Open model setup guide", use_container_width=True):
+                    st.session_state.open_training_dialog = True
+                    st.rerun()
+
+    if not simple_mode:
+        render_disclaimer_banner()
 
     if "devices" not in st.session_state or reset:
         init_state()
 
     _reset_simulation_if_context_changed(scenario, st.session_state.get("cellular_mode", False))
 
-    if st.session_state.get("context_change_message"):
-        st.info(st.session_state.pop("context_change_message"))
+    context_message = st.session_state.pop("context_change_message", None)
+    if context_message and not simple_mode:
+        st.info(context_message)
 
     if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY in store):
         artifacts = store[MODEL_KEY]
@@ -651,7 +642,7 @@ def main():
         trained_at = artifacts.get("trained_at")
         trained_note = f" (saved at {trained_at})" if trained_at else ""
         title = "Bundled startup cache loaded" if artifact_source == "Bundled startup cache" else "Cached model loaded"
-        if not st.session_state.get("startup_cache_notice_dismissed", False):
+        if not simple_mode and not st.session_state.get("startup_cache_notice_dismissed", False):
             notice_cols = st.columns([8, 1.2])
             with notice_cols[0]:
                 render_status_strip(
@@ -664,7 +655,7 @@ def main():
                 if st.button("Hide", key="dismiss_startup_cache_notice", use_container_width=True):
                     st.session_state.startup_cache_notice_dismissed = True
                     st.rerun()
-        else:
+        elif not simple_mode:
             st.caption(
                 f"{title} · Loaded cached model{trained_note}. Use model setup only if you want to rebuild from scratch."
             )
@@ -689,5 +680,9 @@ def main():
         type_filter=type_filter,
         show_heatmap=show_heatmap,
         profile=profile,
+        simple_mode=simple_mode,
     )
-    render_app_footer()
+    if simple_mode:
+        st.caption("Research and educational demo using synthetic data. Not for real-world safety decisions. Supported by VINNOVA, KK-stiftelsen, and Interreg Aurora.")
+    else:
+        render_app_footer()

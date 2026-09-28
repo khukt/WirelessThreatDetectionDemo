@@ -120,7 +120,7 @@ def init_state():
         "hitl_suppression_ticks": CFG.hitl_suppression_ticks,
         "hitl_escalation_boost": CFG.hitl_escalation_boost,
         "presentation_mode": False,
-        "welcome_prompt_dismissed": False,
+        "welcome_prompt_dismissed": True,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
