@@ -68,8 +68,8 @@ The app is designed as a **project-friendly demo hub**: the Home page gives visi
 
 ```bash
 # 1) Clone
-git clone https://github.com/<your-org>/trust-ai-wireless-demo.git
-cd trust-ai-wireless-demo
+git clone https://github.com/khukt/WirelessThreatDetectionDemo.git
+cd WirelessThreatDetectionDemo
 
 # 2) (Recommended) create a virtual env
 python -m venv .venv
@@ -196,4 +196,3 @@ Funding links are surfaced directly in the Home and Governance tabs for presenta
 
 This repository is for **research and educational** demonstration under the TRUST initiative.  
 For industrial use, integration into safety control loops, or redistribution, please **contact the authors**.
-

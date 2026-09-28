@@ -223,7 +223,7 @@ def render_fleet_tab(show_heatmap, role, refresh_interval=None):
                 )
                 st.dataframe(
                     top_risk[["device_id", "type", "live_risk", "risk_band"]],
-                    width="stretch",
+                    use_container_width=True,
                     hide_index=True,
                 )
 
@@ -241,7 +241,7 @@ def render_fleet_tab(show_heatmap, role, refresh_interval=None):
         st.caption(f"Showing {len(devices_df)} of {len(st.session_state.devices)} devices.")
         st.dataframe(
             _style_fleet_inventory(inventory_df.sort_values(["live_risk", "device_id"], ascending=[False, True])),
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
         )
 

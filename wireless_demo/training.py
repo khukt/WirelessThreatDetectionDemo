@@ -33,6 +33,16 @@ def log_train(message: str):
     st.session_state.training_logs.append({"t": timestamp, "msg": message})
 
 
+def suggest_threshold(y_cal, cal_probs):
+    best_f1, best_threshold = -1.0, CFG.threshold
+    for threshold in np.linspace(0.30, 0.90, 61):
+        pred = (cal_probs >= threshold).astype(int)
+        _, _, f1_candidate, _ = precision_recall_fscore_support(y_cal, pred, average="binary", zero_division=0)
+        if f1_candidate > best_f1:
+            best_f1, best_threshold = f1_candidate, threshold
+    return float(best_threshold)
+
+
 def render_training_explainer(nonce: str):
     training_info = st.session_state.get("training_info", {})
     if not training_info:
@@ -92,7 +102,7 @@ def render_training_explainer(nonce: str):
     logs = st.session_state.get("training_logs", [])
     if logs:
         st.markdown("#### Training console")
-        st.dataframe(pd.DataFrame(logs).tail(50), width="stretch")
+        st.dataframe(pd.DataFrame(logs).tail(50), use_container_width=True)
 
 
 def make_training_data(n_ticks=400, progress_cb=None, pct_start=0, pct_end=70):
@@ -313,23 +323,17 @@ def train_model_with_progress(n_ticks=350):
 
     update(90, "Calibrating confidence…")
     cal_probs = model.predict_proba(Xca_df)[:, 1]
-    cal_nonconformity = 1 - np.where(y_cal == 1, cal_probs, 1 - cal_probs)
+    normal_cal_scores = cal_probs[y_cal == 0]
+
+    best_threshold = suggest_threshold(y_cal, cal_probs)
+    st.session_state.suggested_threshold = float(best_threshold)
 
     update(93, "Evaluating detector…")
     test_probs = model.predict_proba(Xte_df)[:, 1]
-    preds = (test_probs >= CFG.threshold).astype(int)
+    preds = (test_probs >= best_threshold).astype(int)
     precision, recall, f1, _ = precision_recall_fscore_support(y_test, preds, average="binary", zero_division=0)
     auc = roc_auc_score(y_test, test_probs)
     brier = brier_score_loss(y_test, test_probs)
-
-    thresholds = np.linspace(0.30, 0.90, 61)
-    best_f1, best_threshold = 0.0, CFG.threshold
-    for threshold in thresholds:
-        pred = (test_probs >= threshold).astype(int)
-        _, _, f1_candidate, _ = precision_recall_fscore_support(y_test, pred, average="binary", zero_division=0)
-        if f1_candidate > best_f1:
-            best_f1, best_threshold = f1_candidate, threshold
-    st.session_state.suggested_threshold = float(best_threshold)
 
     update(95, "Training attack type classifier…")
     pos_mask = labels_all != "Normal"
@@ -402,7 +406,7 @@ def train_model_with_progress(n_ticks=350):
     st.session_state.model = model
     st.session_state.scaler = scaler
     st.session_state.explainer = shap.TreeExplainer(model)
-    st.session_state.conformal_scores = cal_nonconformity
+    st.session_state.conformal_scores = normal_cal_scores
     st.session_state.metrics = {"precision": precision, "recall": recall, "f1": f1, "auc": auc, "brier": brier}
     st.session_state.baseline = Xall_df
     baseline_sample = Xall_df.sample(n=min(len(Xall_df), 600), random_state=SEED) if len(Xall_df) > 600 else Xall_df
@@ -421,10 +425,11 @@ def train_model_with_progress(n_ticks=350):
 
     artifacts = {
         "trained_at": st.session_state.artifact_trained_at,
+        "calibration_method": "normal_anomaly_score",
         "model": model,
         "scaler": scaler,
         "explainer": st.session_state.explainer,
-        "conformal_scores": cal_nonconformity,
+        "conformal_scores": normal_cal_scores,
         "metrics": st.session_state.metrics,
         "baseline": Xall_df,
         "global_importance": st.session_state.global_importance,

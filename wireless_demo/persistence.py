@@ -55,6 +55,10 @@ def load_model_artifacts(model_key: str) -> Optional[Dict[str, Any]]:
 
 def hydrate_model_artifacts(artifacts: Dict[str, Any]) -> Dict[str, Any]:
     hydrated = dict(artifacts)
+    if hydrated.get("calibration_method") != "normal_anomaly_score":
+        # Older caches contain scores for both labels with the opposite p-value
+        # convention. They cannot be used as a normal-only reference set.
+        hydrated["conformal_scores"] = None
     model = hydrated.get("model")
     type_clf = hydrated.get("type_clf")
     hydrated["explainer"] = shap.TreeExplainer(model) if model is not None else None
