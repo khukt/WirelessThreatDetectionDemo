@@ -464,15 +464,10 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
             with map_cols[1]:
                 with st.container(border=True):
                     st.markdown("#### Map readout")
-                    readout_cols = st.columns(2)
-                    readout_cols[0].metric("Visible devices", snapshot["visible_devices"])
-                    readout_cols[1].metric("Avg risk", f"{snapshot['avg_risk']:.2f}" if snapshot["visible_devices"] else "—")
-                    readout_cols = st.columns(2)
-                    readout_cols[0].metric("Above threshold", snapshot["above_threshold"])
-                    readout_cols[1].metric(
-                        "Top device",
-                        f"{snapshot['top_device']} · {snapshot['top_risk']:.2f}" if snapshot["visible_devices"] else "Waiting",
-                    )
+                    st.metric("Visible devices", snapshot["visible_devices"])
+                    st.metric("Avg risk", f"{snapshot['avg_risk']:.2f}" if snapshot["visible_devices"] else "—")
+                    st.metric("Above threshold", snapshot["above_threshold"])
+                    st.metric("Top device", f"{snapshot['top_device']} · {snapshot['top_risk']:.2f}" if snapshot["visible_devices"] else "Waiting")
                     st.caption("Use this side panel to read the map quickly without hovering over every device.")
                     st.markdown(
                         "<div class='quick-chip-row'>"
@@ -538,10 +533,11 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                 with chart_cols[idx % 2]:
                     with st.container(border=True):
                         if summary:
-                            metric_cols = st.columns(3)
-                            metric_cols[0].metric("Recent", f"{summary['recent_mean']:.2f}{summary['unit']}")
-                            metric_cols[1].metric("Baseline", f"{summary['baseline_mean']:.2f}{summary['unit']}")
-                            metric_cols[2].metric("Direction", summary["status"], delta=f"{summary['delta']:+.2f}{summary['unit']}")
+                            st.caption(
+                                f"Recent: {summary['recent_mean']:.2f}{summary['unit']} · "
+                                f"Baseline: {summary['baseline_mean']:.2f}{summary['unit']} · "
+                                f"Direction: {summary['status']} ({summary['delta']:+.2f}{summary['unit']})"
+                            )
                         st.plotly_chart(
                             style_plotly_figure(fig, title=title, height=280),
                             use_container_width=True,
@@ -644,7 +640,7 @@ def render_overview_tab(scenario, show_map, type_filter, use_conformal, role, re
                 if top_devices:
                     st.markdown("<div class='quick-chip-row'>" + "".join(top_devices) + "</div>", unsafe_allow_html=True)
                 queue_df, formatters = _queue_dataframe(leaderboard, use_conformal)
-                st.dataframe(queue_df.style.format(formatters), width="stretch", hide_index=True)
+                st.dataframe(queue_df.style.format(formatters), use_container_width=True, hide_index=True)
         else:
             render_focus_callout("No queue yet", "Start playback or run model setup to generate live risk rankings.")
 

@@ -480,6 +480,13 @@ def main():
         render_app_footer()
         return
 
+    store = model_store()
+    if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY not in store):
+        disk_artifacts = load_model_artifacts(MODEL_KEY)
+        if disk_artifacts is not None:
+            disk_artifacts["artifact_source"] = disk_artifacts.get("artifact_source", "Disk cache")
+            store[MODEL_KEY] = disk_artifacts
+
     render_disclaimer_banner()
 
     with st.sidebar:
@@ -540,7 +547,14 @@ def main():
                 )
 
         with st.expander("Model behavior", expanded=False):
-            use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True)
+            cached_artifacts = store.get(MODEL_KEY, {})
+            calibration_available = (
+                st.session_state.get("conformal_scores") is not None
+                or cached_artifacts.get("conformal_scores") is not None
+            )
+            use_conformal = st.checkbox("Conformal risk (calibrated p-value)", True, disabled=not calibration_available)
+            if not calibration_available:
+                st.caption("Calibration is unavailable for this cached model. Run model setup / refresh to enable p-values.")
             threshold_value = st.slider("Incident threshold (model prob.)", 0.30, 0.95, CFG.threshold, 0.01, key="th_slider")
             CFG.threshold = threshold_value
             if st.session_state.get("suggested_threshold") is not None:
@@ -613,13 +627,6 @@ def main():
 
     if st.session_state.get("context_change_message"):
         st.info(st.session_state.pop("context_change_message"))
-
-    store = model_store()
-    if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY not in store):
-        disk_artifacts = load_model_artifacts(MODEL_KEY)
-        if disk_artifacts is not None:
-            disk_artifacts["artifact_source"] = disk_artifacts.get("artifact_source", "Disk cache")
-            store[MODEL_KEY] = disk_artifacts
 
     if (not CFG.retrain_on_start) and (st.session_state.get("model") is None) and (MODEL_KEY in store):
         artifacts = store[MODEL_KEY]

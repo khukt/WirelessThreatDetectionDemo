@@ -376,7 +376,7 @@ def _render_audit_section(reviews, nonce):
     if reviews:
         review_df, display_cols, export_json = _prepare_review_audit_artifacts(pd.DataFrame(reviews).to_json(orient="records"))
         st.caption("Recent human review log")
-        st.dataframe(review_df[display_cols], width="stretch", hide_index=True)
+        st.dataframe(review_df[display_cols], use_container_width=True, hide_index=True)
         st.download_button(
             "Download review audit log",
             data=export_json,
@@ -431,4 +431,3 @@ def render_governance_tab(role):
     _render_pillars_overview()
     _render_live_oversight_section(reviews, status_counts)
     _render_audit_section(reviews, nonce)
-

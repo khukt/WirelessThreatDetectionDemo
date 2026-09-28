@@ -178,7 +178,7 @@ def build_type_explanation(incident: dict) -> str:
 
 def conformal_pvalue(prob):
     cal_scores = st.session_state.get("conformal_scores")
-    if cal_scores is None:
+    if cal_scores is None or len(cal_scores) == 0:
         return None
-    nonconformity = 1 - prob
-    return float((np.sum(cal_scores >= nonconformity) + 1) / (len(cal_scores) + 1))
+    # Calibrate against normal windows: a high anomaly score should have a low p-value.
+    return float((np.sum(cal_scores >= prob) + 1) / (len(cal_scores) + 1))

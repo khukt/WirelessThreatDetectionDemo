@@ -111,9 +111,8 @@ def _render_attack_card(family: str, role: str):
         st.markdown(f"**How the demo models it:** {attack['how_demo_models_it']}")
         st.markdown(f"**Educational limit:** {attack['limits']}")
     else:
-        with st.expander("Open technical note", expanded=False):
-            st.markdown(f"**How the demo models it:** {attack['how_demo_models_it']}")
-            st.markdown(f"**Educational limit:** {attack['limits']}")
+        st.caption(f"How the demo models it: {attack['how_demo_models_it']}")
+        st.caption(f"Educational limit: {attack['limits']}")
 
 
 def render_attack_academy(role: str, selected_scenario: str | None = None):

@@ -85,8 +85,7 @@ def _render_attack_academy_home(role, scenario):
         kicker="Attack Academy",
     )
     render_current_attack_brief(scenario, role, title="Current scenario explainer")
-    with st.expander("Compare all attack scenarios", expanded=False):
-        render_attack_academy(role, selected_scenario=scenario)
+    render_attack_academy(role, selected_scenario=scenario)
 
 
 def _render_restart_onboarding_callout():

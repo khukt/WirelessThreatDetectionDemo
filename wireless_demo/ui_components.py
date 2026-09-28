@@ -266,7 +266,7 @@ def _render_ai_builder_details(incident):
     with detail_tabs[2]:
         frame = _type_probability_frame(incident)
         if len(frame) > 0:
-            st.dataframe(frame, width="stretch")
+            st.dataframe(frame, use_container_width=True)
         else:
             st.info("Type probability breakdown is not available for this incident.")
 
@@ -396,7 +396,7 @@ def render_device_inspector_from_incident(incident, topk=8, scope="main"):
             st.info("Recent telemetry is not available for this device yet.")
 
     with tabs[2]:
-        st.dataframe(x_scaled_df.T.rename(columns={0: "z-value"}), width="stretch")
+        st.dataframe(x_scaled_df.T.rename(columns={0: "z-value"}), use_container_width=True)
 
 
 def render_incident_card(incident, role, scope="main"):

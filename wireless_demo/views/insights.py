@@ -78,7 +78,7 @@ def _render_insights_takeaway(role):
 def _render_conformal_explainer():
     render_focus_callout(
         "What a conformal p-value means",
-        "It is a trust check on the alert score. Higher values mean the current behavior looks more like past examples of that label. Lower values mean the case is less typical, so the app should treat the prediction more cautiously.",
+        "It compares an anomaly score with held-out normal windows. A lower p-value means a score this high was rare among normal windows, so the case warrants closer review.",
     )
 
 
@@ -1051,7 +1051,7 @@ def _render_model_transparency_card(nonce, role):
                     {"step": "Final output", "description": "The incident card shows severity, type label, evidence features, and confidence context."},
                 ]
             )
-            st.dataframe(decision_df, width="stretch", hide_index=True)
+            st.dataframe(decision_df, use_container_width=True, hide_index=True)
 
         with tabs[1]:
             st.caption("Top drivers")
