@@ -73,7 +73,7 @@ def _render_project_banner(role, scenario, profile):
 
 
 def _open_home_destination(tab_name: str, message: str):
-    st.session_state.active_primary_tab = tab_name
+    st.session_state.pending_primary_tab = tab_name
     st.session_state.home_message = message
     st.rerun()
 

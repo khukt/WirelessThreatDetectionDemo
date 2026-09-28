@@ -4,7 +4,7 @@ A **Streamlit-based interactive demo** for trustworthy anomaly detection in real
 It simulates Wi‑Fi/private‑5G, cellular, GNSS and integrity signals for a small fleet (AMRs, trucks, sensors, gateways) and
 demonstrates **transparent AI**: calibrated anomaly detection, attack typing, role-aware explanations, and EU AI Act–style governance.
 
-The app is designed as a **project-friendly demo hub**: the Home page gives visitors a guided landing experience, explains the project story in plain language, and provides clean entry points for operational, technical, regulatory, and executive audiences.
+The app opens in **Simple view** for first-time visitors: choose a scenario, watch simulated activity, and review alerts. Turn off **Simple view** in the sidebar for the original technical, regulatory, and model-analysis tools.
 
 > Mid Sweden University · TRUST AI — Realistic Wireless Threats (Sundsvall)  
 > Two‑step pipeline: **LightGBM anomaly detector** + **(LightGBM multiclass + rules) for attack typing**  
@@ -18,7 +18,7 @@ The app is designed as a **project-friendly demo hub**: the Home page gives visi
 - **Binary anomaly detector** with LightGBM, imbalance‑aware training, and **conformal p‑values** for calibrated risk.
 - **Attack typing head**: LightGBM multiclass + **domain rule fusion** (Jamming, Access Breach, GPS Spoofing, Data Tamper).
 - **Persona‑aware explanations** (End User, Domain Expert, Regulator, AI Builder, Executive).
-- **Project-friendly Home page** with guided onboarding, project summary cards, and audience-aware navigation.
+- **Simple first-visit flow** with three destinations: Start, Live activity, and Alerts; the guided tour remains available in Advanced view.
 - **Interactive visuals**: PyDeck geospatial map, risk overlays, KPI heatmaps, incident dashboards.
 - **Governance tools**: model card export, audit log download, training explainer, and transparency artifacts.
 - **Caching** of trained models to avoid retraining on browser refresh.
@@ -101,12 +101,12 @@ Open your browser at **http://localhost:8501**.
 
 ---
 
-## 🏠 Home Page Experience
+## 🏠 First-Visit Experience
 
-- **Project landing banner:** frames the demo as a showcase hub, not just a control screen.
-- **Summary cards:** explain project value, visitor benefit, and the best first step.
-- **Guided exploration:** scenario, role, and next-tab choices are presented as clear visual entry points.
-- **Project context:** funding acknowledgement and project links are available directly from the Home page.
+- **Start:** explains the demo and offers one-click entry into live activity or a scenario that produces sample alerts.
+- **Live activity:** shows a short status summary and the devices that may need attention.
+- **Alerts:** gives plain-language evidence and three review choices.
+- **Advanced view:** restores the full fleet, insights, governance, scenario, and model controls. Its guided tour is optional.
 
 ---
 
@@ -123,6 +123,8 @@ Open your browser at **http://localhost:8501**.
 ---
 
 ## 🎛️ UI Guide (Sidebar Controls)
+
+In Simple view, use **Scenario**, **Run simulation**, and **Reset simulation**. Turn off **Simple view** to access the controls below.
 
 - **Comms profile:** Wi‑Fi/private‑5G dominant vs. cellular‑dominant road profile.  
 - **Scenario:** `Normal`, `Jamming (localized)`, `Access Breach (AP/gNB)`, `GPS Spoofing (subset)`, `Data Tamper (gateway)`  
